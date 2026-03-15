@@ -181,12 +181,12 @@
 
 <script>
   const LANGUAGES = [
-    { code: 'en', label: 'English', flag: '🇬🇧' },
-    { code: 'it', label: 'Italian', flag: '🇮🇹' },
-    { code: 'fr', label: 'French', flag: '🇫🇷' },
-    { code: 'de', label: 'German', flag: '🇩🇪' },
-    { code: 'pt', label: 'Portuguese', flag: '🇵🇹' },
-  ];
+  { code: 'en', label: 'English', flag: '🇬🇧', country: 'gb' },
+  { code: 'it', label: 'Italian', flag: '🇮🇹', country: 'it' },
+  { code: 'fr', label: 'French', flag: '🇫🇷', country: 'fr' },
+  { code: 'de', label: 'German', flag: '🇩🇪', country: 'de' },
+  { code: 'pt', label: 'Portuguese', flag: '🇵🇹', country: 'pt' },
+];
 
   let data = JSON.parse(localStorage.getItem('gamestats') || '{"players":[],"matches":[]}');
   let settings = JSON.parse(localStorage.getItem('gamestats_settings') || '{"minMatches":0}');
@@ -230,12 +230,19 @@
 
   function getPlayerObj(name) { return data.players.find(p => p.name === name); }
 
-  function getFlag(name) {
-    const p = getPlayerObj(name);
-    if (!p || !p.lang) return '';
-    const l = LANGUAGES.find(l => l.code === p.lang);
-    return l ? l.flag + ' ' : '';
-  }
+  function flagImg(code) {
+  if (!code) return '';
+  const country = { en: 'gb', it: 'it', fr: 'fr', de: 'de', pt: 'pt' };
+  const c = country[code];
+  if (!c) return '';
+  return `<img src="https://flagcdn.com/20x15/${c}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${c}">`;
+}
+
+function getFlag(name) {
+  const p = getPlayerObj(name);
+  if (!p || !p.lang) return '';
+  return flagImg(p.lang);
+}
 
   function getStats(name) {
     const wins = data.matches.filter(m => m.winner === name).length;
@@ -458,8 +465,8 @@
     const lf = document.getElementById('lang-filter');
     const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
     const langBtns = LANGUAGES.map(l =>
-      `<button class="lang-btn ${activeLang === l.code ? 'active' : ''}" onclick="setLangFilter('${l.code}')">${l.flag} ${l.label}</button>`
-    ).join('');
+  `<button class="lang-btn ${activeLang === l.code ? 'active' : ''}" onclick="setLangFilter('${l.code}')"><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">${l.label}</button>`
+).join('');
     lf.innerHTML = allBtn + langBtns;
 
     // Filter players
