@@ -37,7 +37,6 @@
   .message { background: #1e40af; color: #bfdbfe; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; font-weight: 600; }
   .empty { text-align: center; color: #94a3b8; padding: 40px; }
   .medal { font-size: 20px; margin-right: 8px; }
-  .hint { color: #475569; font-size: 12px; text-align: center; margin-top: 8px; }
   .section-title { color: #38bdf8; font-size: 16px; margin-bottom: 12px; font-weight: 700; }
   .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
   .input-row input { margin-bottom: 0; }
@@ -47,7 +46,7 @@
   .bar-bg { background: #0f172a; border-radius: 4px; height: 6px; margin-top: 6px; }
   .bar-fill { background: #38bdf8; border-radius: 4px; height: 6px; transition: width 0.4s; }
   .edit-row { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
-  .edit-row select { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
+  .edit-row select, .edit-row input { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
   .btn-actions { display: flex; gap: 6px; }
 </style>
 </head>
@@ -101,6 +100,7 @@
 <script>
   let data = JSON.parse(localStorage.getItem('gamestats') || '{"players":[],"matches":[]}');
   let editingMatch = null;
+  let editingPlayer = null;
   let selectedPlayer = null;
 
   function save() {
@@ -121,6 +121,7 @@
     document.getElementById('tab-' + tab).classList.add('active');
     btn.classList.add('active');
     editingMatch = null;
+    editingPlayer = null;
     render();
   }
 
@@ -158,6 +159,37 @@
     render();
   }
 
+  function startEditPlayer(name) {
+    editingPlayer = editingPlayer === name ? null : name;
+    render();
+    if (editingPlayer) {
+      setTimeout(() => {
+        const input = document.getElementById('edit-player-' + name);
+        if (input) { input.focus(); input.select(); }
+      }, 50);
+    }
+  }
+
+  function saveEditPlayer(oldName) {
+    const input = document.getElementById('edit-player-' + oldName);
+    const newName = input.value.trim();
+    if (!newName) { showMessage('Name cannot be empty!'); return; }
+    if (newName.toLowerCase() !== oldName.toLowerCase() && data.players.find(p => p.toLowerCase() === newName.toLowerCase())) {
+      showMessage('Player already exists!'); return;
+    }
+    // Update player name everywhere
+    data.players = data.players.map(p => p === oldName ? newName : p);
+    data.matches = data.matches.map(m => ({
+      ...m,
+      winner: m.winner === oldName ? newName : m.winner,
+      loser: m.loser === oldName ? newName : m.loser
+    }));
+    save();
+    editingPlayer = null;
+    showMessage('Player renamed to ' + newName + '! ✅');
+    render();
+  }
+
   function logMatch() {
     const winner = document.getElementById('winner').value;
     const loser = document.getElementById('loser').value;
@@ -180,12 +212,12 @@
     render();
   }
 
-  function startEdit(index) {
+  function startEditMatch(index) {
     editingMatch = editingMatch === index ? null : index;
     render();
   }
 
-  function saveEdit(index) {
+  function saveEditMatch(index) {
     const newWinner = document.getElementById('edit-winner-' + index).value;
     const newLoser = document.getElementById('edit-loser-' + index).value;
     if (!newWinner || !newLoser || newWinner === newLoser) {
@@ -269,7 +301,7 @@
             <select id="edit-loser-${i}">
               ${data.players.map(p => `<option value="${p}" ${p === m.loser ? 'selected' : ''}>${p}</option>`).join('')}
             </select>
-            <button class="btn-small btn-save" onclick="saveEdit(${i})">Save</button>
+            <button class="btn-small btn-save" onclick="saveEditMatch(${i})">Save</button>
           </div>`;
         }
         return `<div class="card">
@@ -278,7 +310,7 @@
             <div style="display:flex;gap:6px;align-items:center">
               <span style="color:#475569;font-size:12px">${m.date}</span>
               <div class="btn-actions">
-                <button class="btn-small btn-edit" onclick="startEdit(${i})">✏️</button>
+                <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
                 <button class="btn-small btn-delete" onclick="deleteMatch(${i})">🗑️</button>
               </div>
             </div>
@@ -295,13 +327,27 @@
     } else {
       pl.innerHTML = data.players.map(p => {
         const s = getStats(p);
-        return `<div class="card"><div class="row">
-          <span style="font-weight:700">${p}</span>
-          <div style="display:flex;gap:10px;align-items:center">
-            <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
-            <button class="btn-small btn-delete" onclick="deletePlayer('${p}')">Delete</button>
+        const isEditing = editingPlayer === p;
+        let editSection = '';
+        if (isEditing) {
+          editSection = `<div class="edit-row">
+            <input id="edit-player-${p}" value="${p}" onkeydown="if(event.key==='Enter') saveEditPlayer('${p}')">
+            <button class="btn-small btn-save" onclick="saveEditPlayer('${p}')">Save</button>
+          </div>`;
+        }
+        return `<div class="card">
+          <div class="row">
+            <span style="font-weight:700">${p}</span>
+            <div style="display:flex;gap:10px;align-items:center">
+              <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
+              <div class="btn-actions">
+                <button class="btn-small btn-edit" onclick="startEditPlayer('${p}')">✏️</button>
+                <button class="btn-small btn-delete" onclick="deletePlayer('${p}')">🗑️</button>
+              </div>
+            </div>
           </div>
-        </div></div>`;
+          ${editSection}
+        </div>`;
       }).join('');
     }
   }
