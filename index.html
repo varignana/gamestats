@@ -20,10 +20,8 @@
   .card.selected { border-color: #38bdf8; }
   input, select { width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: #f1f5f9; border: 1px solid #334155; font-size: 15px; margin-bottom: 16px; outline: none; }
   input:focus, select:focus { border-color: #38bdf8; }
-  .btn { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: opacity 0.2s; margin-bottom: 10px; }
-  .btn:hover { opacity: 0.9; }
-  .btn-outline { width: 100%; padding: 14px; background: transparent; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
-  .btn-outline:hover { background: #38bdf8; color: #0f172a; }
+  .btn { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
+  .btn-outline { width: 100%; padding: 14px; background: transparent; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin-bottom: 10px; display: block; text-align: center; }
   .btn-danger { width: 100%; padding: 14px; background: transparent; color: #ef4444; border: 2px solid #ef4444; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
   .btn-small { padding: 6px 10px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 700; }
   .btn-add { background: #38bdf8; color: #0f172a; }
@@ -31,7 +29,6 @@
   .btn-edit { background: #f59e0b; color: #0f172a; }
   .btn-save { background: #4ade80; color: #0f172a; }
   .btn-back { display: flex; align-items: center; gap: 8px; background: #1e293b; color: #94a3b8; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 14px; margin-bottom: 20px; }
-  .btn-back:hover { color: #f1f5f9; }
   .row { display: flex; justify-content: space-between; align-items: center; }
   .win { color: #4ade80; font-weight: 700; }
   .loss { color: #f87171; font-weight: 700; }
@@ -41,7 +38,7 @@
   .message.success { background: #14532d; color: #86efac; }
   .message.error { background: #7f1d1d; color: #fca5a5; }
   .empty { text-align: center; color: #94a3b8; padding: 40px; }
-  .medal { font-size: 20px; margin-right: 8px; }
+  .medal { font-size: 18px; margin-right: 8px; }
   .section-title { color: #38bdf8; font-size: 16px; margin-bottom: 12px; font-weight: 700; }
   .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
   .input-row input { margin-bottom: 0; }
@@ -49,30 +46,23 @@
   .tab { display: none; }
   .tab.active { display: block; }
   .bar-bg { background: #0f172a; border-radius: 4px; height: 6px; margin-top: 6px; }
-  .bar-fill { background: #38bdf8; border-radius: 4px; height: 6px; transition: width 0.4s; }
+  .bar-fill { background: #38bdf8; border-radius: 4px; height: 6px; }
   .edit-row { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
   .edit-row select, .edit-row input { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
   .btn-actions { display: flex; gap: 6px; }
   .divider { border: none; border-top: 1px solid #334155; margin: 20px 0; }
-  .stats-box { background: #0f172a; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-around; text-align: center; }
-  .stats-box div { display: flex; flex-direction: column; }
-  .stats-box span:first-child { font-size: 22px; font-weight: 800; color: #38bdf8; }
-  .stats-box span:last-child { font-size: 11px; color: #64748b; margin-top: 2px; }
-  /* Language filter */
   .lang-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-  .lang-btn { padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; font-weight: 700; font-size: 12px; background: #1e293b; color: #94a3b8; transition: all 0.2s; }
+  .lang-btn { padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer; font-weight: 700; font-size: 13px; background: #1e293b; color: #94a3b8; }
   .lang-btn.active { background: #38bdf8; color: #0f172a; }
-  /* Dropdown h2h */
   .h2h-dropdown { margin-top: 12px; border-top: 1px solid #334155; padding-top: 12px; }
   .h2h-overall { display: flex; justify-content: space-around; background: #0f172a; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; }
   .h2h-overall div { display: flex; flex-direction: column; }
   .h2h-overall span:first-child { font-size: 18px; font-weight: 800; }
   .h2h-overall span:last-child { font-size: 10px; color: #64748b; }
-  .h2h-opponent-row { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: border 0.2s; border: 1px solid transparent; }
+  .h2h-opponent-row { display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; border: 1px solid transparent; }
   .h2h-opponent-row:hover { border-color: #38bdf8; }
   .h2h-opponent-name { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
   .h2h-opponent-stats { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-  /* H2H Screen */
   .screen { display: none; }
   .screen.active { display: block; }
   .h2h-header { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; text-align: center; }
@@ -85,19 +75,26 @@
   .h2h-score-item { display: flex; flex-direction: column; align-items: center; }
   .h2h-score-item span:first-child { font-size: 28px; font-weight: 800; }
   .h2h-score-item span:last-child { font-size: 11px; color: #64748b; }
-  .lang-tag { font-size: 16px; }
-  .flag { font-size: 14px; }
-  /* Player detail screen */
-  .player-header { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
-  .player-header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .player-avatar { width: 52px; height: 52px; border-radius: 50%; background: #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #0f172a; flex-shrink: 0; }
-  .player-header-info h2 { font-size: 20px; font-weight: 800; }
-  .player-header-info span { color: #94a3b8; font-size: 13px; }
   .match-history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #334155; font-size: 14px; }
   .match-history-item:last-child { border-bottom: none; }
   .result-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 800; }
   .result-win { background: #14532d; color: #4ade80; }
   .result-loss { background: #7f1d1d; color: #f87171; }
+  /* General stats section */
+  .gen-stats { margin-top: 8px; }
+  .gen-stats-title { color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px; }
+  .gen-stat-card { background: #1e293b; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
+  .gen-stat-card .label { color: #64748b; font-size: 12px; margin-bottom: 4px; }
+  .gen-stat-card .value { font-size: 16px; font-weight: 800; color: #f1f5f9; }
+  .gen-stat-card .sub { color: #94a3b8; font-size: 13px; margin-top: 2px; }
+  .lang-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
+  .lang-stat-row:last-child { border-bottom: none; }
+  /* Unranked badge */
+  .unranked { background: #334155; color: #64748b; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+  /* Min matches setting */
+  .setting-row { display: flex; justify-content: space-between; align-items: center; background: #1e293b; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
+  .setting-row label { color: #94a3b8; font-size: 13px; margin: 0; }
+  .setting-row input[type=number] { width: 60px; padding: 6px 8px; font-size: 14px; margin: 0; text-align: center; }
 </style>
 </head>
 <body>
@@ -115,15 +112,13 @@
       <button onclick="switchTab('players', this)">👥 Players</button>
     </div>
 
-    <!-- STATS TAB -->
     <div id="tab-dashboard" class="tab active">
-      <div id="summary-box"></div>
-      <div class="section-title">🏆 Leaderboard</div>
       <div class="lang-filter" id="lang-filter"></div>
+      <div class="section-title">🏆 Leaderboard</div>
       <div id="leaderboard"></div>
+      <div id="general-stats" class="gen-stats"></div>
     </div>
 
-    <!-- LOG MATCH TAB -->
     <div id="tab-log" class="tab">
       <div class="section-title">Log a Match</div>
       <label>🏆 Winner</label>
@@ -133,24 +128,43 @@
       <button class="btn" onclick="logMatch()">Log Match</button>
     </div>
 
-    <!-- HISTORY TAB -->
     <div id="tab-history" class="tab">
       <div class="section-title">📋 Match History</div>
       <div id="history-list"></div>
     </div>
 
-    <!-- PLAYERS TAB -->
     <div id="tab-players" class="tab">
-      <div class="section-title">Manage Players</div>
-      <div class="input-row">
-        <input id="newPlayer" placeholder="Player name..." onkeydown="if(event.key==='Enter') addPlayer()">
-        <button class="btn-small btn-add" onclick="addPlayer()">Add</button>
+      <div class="section-title">Add Player</div>
+      <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+        <div class="input-row" style="margin-bottom:10px;">
+          <input id="newPlayer" placeholder="Player name..." onkeydown="if(event.key==='Enter') addPlayer()" style="margin-bottom:0">
+          <button class="btn-small btn-add" onclick="addPlayer()">Add</button>
+        </div>
+        <label style="margin-bottom:6px;">Language team</label>
+        <select id="newPlayerLang" style="margin-bottom:0">
+          <option value="">No language</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="it">🇮🇹 Italian</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="de">🇩🇪 German</option>
+          <option value="pt">🇵🇹 Portuguese</option>
+        </select>
       </div>
+
+      <div class="section-title">Players</div>
       <div id="player-list"></div>
+
+      <hr class="divider">
+      <div class="section-title">⚙️ Settings</div>
+      <div class="setting-row">
+        <label>Min matches to appear in leaderboard</label>
+        <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
+      </div>
+
       <hr class="divider">
       <div class="section-title">📤 Export & Import</div>
       <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
-      <label for="importFile" class="btn-outline" style="display:block;text-align:center;cursor:pointer;padding:14px;border-radius:10px;border:2px solid #38bdf8;color:#38bdf8;font-weight:800;font-size:16px;margin-bottom:10px;">📥 Import Data</label>
+      <label for="importFile" class="btn-outline">📥 Import Data</label>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
       <hr class="divider">
       <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
@@ -175,7 +189,7 @@
   ];
 
   let data = JSON.parse(localStorage.getItem('gamestats') || '{"players":[],"matches":[]}');
-  // migrate old players to objects
+  let settings = JSON.parse(localStorage.getItem('gamestats_settings') || '{"minMatches":0}');
   data.players = data.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
 
   let editingMatch = null;
@@ -183,8 +197,11 @@
   let selectedPlayer = null;
   let activeLang = 'all';
 
-  function save() {
-    localStorage.setItem('gamestats', JSON.stringify(data));
+  function save() { localStorage.setItem('gamestats', JSON.stringify(data)); }
+  function saveSettings() {
+    settings.minMatches = parseInt(document.getElementById('minMatchesSetting').value) || 0;
+    localStorage.setItem('gamestats_settings', JSON.stringify(settings));
+    render();
   }
 
   function showMessage(msg, type = 'info') {
@@ -203,18 +220,21 @@
     btn.classList.add('active');
     editingMatch = null;
     editingPlayer = null;
+    if (tab === 'players') {
+      setTimeout(() => {
+        document.getElementById('minMatchesSetting').value = settings.minMatches;
+      }, 50);
+    }
     render();
   }
 
-  function getPlayerObj(name) {
-    return data.players.find(p => p.name === name);
-  }
+  function getPlayerObj(name) { return data.players.find(p => p.name === name); }
 
   function getFlag(name) {
     const p = getPlayerObj(name);
     if (!p || !p.lang) return '';
     const l = LANGUAGES.find(l => l.code === p.lang);
-    return l ? l.flag : '';
+    return l ? l.flag + ' ' : '';
   }
 
   function getStats(name) {
@@ -235,22 +255,23 @@
 
   function addPlayer() {
     const name = document.getElementById('newPlayer').value.trim();
+    const lang = document.getElementById('newPlayerLang').value;
     if (!name) return;
     if (data.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
       showMessage('Player already exists!', 'error'); return;
     }
-    data.players.push({ name, lang: '' });
+    data.players.push({ name, lang });
     save();
     document.getElementById('newPlayer').value = '';
+    document.getElementById('newPlayerLang').value = '';
     showMessage(name + ' added!', 'success');
     render();
   }
 
   function deletePlayer(name) {
-    if (!confirm('Delete ' + name + '? Their match history will be kept.')) return;
+    if (!confirm('Delete ' + name + '?')) return;
     data.players = data.players.filter(p => p.name !== name);
-    save();
-    render();
+    save(); render();
   }
 
   function startEditPlayer(name) {
@@ -279,10 +300,8 @@
       winner: m.winner === oldName ? newName : m.winner,
       loser: m.loser === oldName ? newName : m.loser
     }));
-    save();
-    editingPlayer = null;
-    showMessage('Player updated!', 'success');
-    render();
+    save(); editingPlayer = null;
+    showMessage('Player updated!', 'success'); render();
   }
 
   function logMatch() {
@@ -295,16 +314,13 @@
     save();
     document.getElementById('winner').value = '';
     document.getElementById('loser').value = '';
-    showMessage('Match logged! ✅', 'success');
-    render();
+    showMessage('Match logged! ✅', 'success'); render();
   }
 
   function deleteMatch(index) {
     if (!confirm('Delete this match?')) return;
     data.matches.splice(index, 1);
-    save();
-    editingMatch = null;
-    render();
+    save(); editingMatch = null; render();
   }
 
   function startEditMatch(index) {
@@ -320,10 +336,8 @@
     }
     data.matches[index].winner = newWinner;
     data.matches[index].loser = newLoser;
-    save();
-    editingMatch = null;
-    showMessage('Match updated!', 'success');
-    render();
+    save(); editingMatch = null;
+    showMessage('Match updated!', 'success'); render();
   }
 
   function openH2H(p1, p2) {
@@ -341,7 +355,7 @@
           const isP1Win = m.winner === p1;
           return `<div class="match-history-item">
             <span style="color:#94a3b8;font-size:12px">${m.date}</span>
-            <span><span class="${isP1Win ? 'win' : 'loss'}">${m.winner}</span> beat <span class="${isP1Win ? 'loss' : 'win'}">${m.loser}</span></span>
+            <span><span class="${isP1Win ? 'win' : 'loss'}">${getFlag(m.winner)}${m.winner}</span> beat <span class="${isP1Win ? 'loss' : 'win'}">${getFlag(m.loser)}${m.loser}</span></span>
             <span class="result-badge ${isP1Win ? 'result-win' : 'result-loss'}">${isP1Win ? 'W' : 'L'}</span>
           </div>`;
         }).join('');
@@ -350,12 +364,12 @@
       <div class="h2h-header">
         <div class="h2h-header-names">
           <div class="h2h-header-player">
-            <span>${p1flag} ${p1}</span>
+            <span>${p1flag}${p1}</span>
             <span>${h.p1wins} wins</span>
           </div>
           <div class="h2h-vs">VS</div>
           <div class="h2h-header-player">
-            <span>${p2flag} ${p2}</span>
+            <span>${p2flag}${p2}</span>
             <span>${h.p2wins} wins</span>
           </div>
         </div>
@@ -366,8 +380,7 @@
         </div>
       </div>
       <div class="section-title">Match History</div>
-      <div class="card">${historyHTML}</div>
-    `;
+      <div class="card">${historyHTML}</div>`;
 
     document.getElementById('main-app').style.display = 'none';
     document.getElementById('h2h-screen').classList.add('active');
@@ -420,9 +433,7 @@
     if (!confirm('Reset ALL data? This cannot be undone!')) return;
     if (!confirm('Are you absolutely sure?')) return;
     data = { players: [], matches: [] };
-    save();
-    showMessage('All data reset.', 'info');
-    render();
+    save(); showMessage('All data reset.', 'info'); render();
   }
 
   function setLangFilter(lang) {
@@ -431,10 +442,19 @@
     render();
   }
 
+  function getLongestWinStreak(name) {
+    let best = 0, current = 0;
+    data.matches.forEach(m => {
+      if (m.winner === name) { current++; best = Math.max(best, current); }
+      else if (m.loser === name) { current = 0; }
+    });
+    return best;
+  }
+
   function render() {
     const playerNames = data.players.map(p => p.name);
 
-    // Language filter buttons
+    // Language filter
     const lf = document.getElementById('lang-filter');
     const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
     const langBtns = LANGUAGES.map(l =>
@@ -442,46 +462,41 @@
     ).join('');
     lf.innerHTML = allBtn + langBtns;
 
-    // Filter players by language
+    // Filter players
     const filteredPlayers = activeLang === 'all'
       ? data.players
       : data.players.filter(p => p.lang === activeLang);
 
-    // Summary box
-    const sb = document.getElementById('summary-box');
-    sb.innerHTML = `<div class="stats-box">
-      <div><span>${data.players.length}</span><span>Players</span></div>
-      <div><span>${data.matches.length}</span><span>Matches</span></div>
-      <div><span>${data.players.length > 0 ? (data.matches.length / data.players.length).toFixed(1) : 0}</span><span>Avg/player</span></div>
-    </div>`;
+    // Sort: ranked players first (by win%, then wins), then unranked
+    const minM = settings.minMatches || 0;
+    const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
+    const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
 
-    // Leaderboard
-    const sorted = [...filteredPlayers].sort((a, b) => {
-      const sa = getStats(a.name), sb2 = getStats(b.name);
-      return sb2.pct - sa.pct || sb2.wins - sa.wins;
-    });
+    const sortByStats = (a, b) => {
+      const sa = getStats(a.name), sb = getStats(b.name);
+      return sb.pct - sa.pct || sb.wins - sa.wins || sb.total - sa.total;
+    };
+    ranked.sort(sortByStats);
 
     const lb = document.getElementById('leaderboard');
-    if (sorted.length === 0) {
+    if (filteredPlayers.length === 0) {
       lb.innerHTML = '<div class="empty">No players found.</div>';
     } else {
-      const medals = ['🥇','🥈','🥉'];
-      lb.innerHTML = sorted.map((p, i) => {
+      const medals = ['🥇', '🥈', '🥉'];
+      const rankedHTML = ranked.map((p, i) => {
         const s = getStats(p.name);
         const isSelected = selectedPlayer === p.name;
         const flag = getFlag(p.name);
 
         let dropdown = '';
         if (isSelected) {
-          // Overall stats row
           const overallHTML = `<div class="h2h-overall">
             <div><span class="win">${s.wins}</span><span>Wins</span></div>
             <div><span style="color:#f1f5f9">${s.total}</span><span>Total</span></div>
             <div><span class="loss">${s.losses}</span><span>Losses</span></div>
-            <div><span class="pct" style="background:transparent;padding:0">${s.pct}%</span><span>Win rate</span></div>
+            <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
           </div>`;
 
-          // Opponents sorted by most matches
           const opponents = playerNames
             .filter(op => op !== p.name)
             .map(op => ({ name: op, ...getH2H(p.name, op) }))
@@ -493,7 +508,7 @@
             : opponents.map(op => {
                 const opFlag = getFlag(op.name);
                 return `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
-                  <div class="h2h-opponent-name">${opFlag} ${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
+                  <div class="h2h-opponent-name">${opFlag}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
                   <div class="h2h-opponent-stats">
                     <span class="win">${op.p1wins}W</span>
                     <span class="loss">${op.p2wins}L</span>
@@ -512,8 +527,8 @@
         return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer('${p.name}')">
           <div class="row">
             <div style="display:flex;align-items:center">
-              <span class="medal">${medals[i] || (i+1)+'.'}</span>
-              <span style="font-weight:700;font-size:16px">${flag} ${p.name}</span>
+              <span class="medal">${medals[i] || (i + 1) + '.'}</span>
+              <span style="font-weight:700;font-size:16px">${flag}${p.name}</span>
             </div>
             <div style="display:flex;gap:10px;align-items:center">
               <span class="win">${s.wins}W</span>
@@ -525,10 +540,116 @@
           ${dropdown}
         </div>`;
       }).join('');
+
+      const unrankedHTML = unranked.length === 0 ? '' :
+        `<div style="color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;">Unranked (less than ${minM} match${minM !== 1 ? 'es' : ''})</div>` +
+        unranked.map(p => {
+          const s = getStats(p.name);
+          const flag = getFlag(p.name);
+          return `<div class="card" style="opacity:0.6">
+            <div class="row">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="unranked">—</span>
+                <span style="font-weight:700">${flag}${p.name}</span>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center">
+                <span class="win">${s.wins}W</span>
+                <span class="loss">${s.losses}L</span>
+                <span style="color:#475569;font-size:12px">${s.total} played</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+
+      lb.innerHTML = rankedHTML + unrankedHTML;
+    }
+
+    // General stats at bottom
+    const gs = document.getElementById('general-stats');
+
+    if (data.matches.length === 0) {
+      gs.innerHTML = '';
+    } else {
+      // Most active player
+      const mostActive = [...data.players].sort((a, b) => getStats(b.name).total - getStats(a.name).total)[0];
+
+      // Biggest rivalry
+      let biggestRivalry = null, maxRivalMatches = 0;
+      for (let i = 0; i < data.players.length; i++) {
+        for (let j = i + 1; j < data.players.length; j++) {
+          const h = getH2H(data.players[i].name, data.players[j].name);
+          if (h.total > maxRivalMatches) {
+            maxRivalMatches = h.total;
+            biggestRivalry = { p1: data.players[i].name, p2: data.players[j].name, ...h };
+          }
+        }
+      }
+
+      // Longest win streak across all players
+      let bestStreakPlayer = '', bestStreak = 0;
+      data.players.forEach(p => {
+        const s = getLongestWinStreak(p.name);
+        if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; }
+      });
+
+      // Stats per language
+      const langStatsHTML = LANGUAGES.map(l => {
+        const lPlayers = data.players.filter(p => p.lang === l.code);
+        if (lPlayers.length === 0) return '';
+        const lNames = lPlayers.map(p => p.name);
+        const lMatches = data.matches.filter(m => lNames.includes(m.winner) || lNames.includes(m.loser));
+        const lWins = data.matches.filter(m => lNames.includes(m.winner)).length;
+        const lTotal = lMatches.length;
+        const lWinRate = lTotal === 0 ? 0 : Math.round((lWins / lTotal) * 100);
+        return `<div class="lang-stat-row">
+          <span>${l.flag} ${l.label}</span>
+          <span style="display:flex;gap:12px;font-size:13px">
+            <span style="color:#94a3b8">${lPlayers.length} players</span>
+            <span style="color:#94a3b8">${lMatches.length} matches</span>
+            <span class="pct">${lWinRate}%</span>
+          </span>
+        </div>`;
+      }).filter(Boolean).join('');
+
+      gs.innerHTML = `
+        <div class="gen-stats-title">🔢 General Stats</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="gen-stat-card">
+            <div class="label">Total matches</div>
+            <div class="value">${data.matches.length}</div>
+          </div>
+          <div class="gen-stat-card">
+            <div class="label">Total players</div>
+            <div class="value">${data.players.length}</div>
+          </div>
+        </div>
+
+        ${mostActive ? `<div class="gen-stat-card">
+          <div class="label">Most active player</div>
+          <div class="value">${getFlag(mostActive.name)}${mostActive.name}</div>
+          <div class="sub">${getStats(mostActive.name).total} matches played</div>
+        </div>` : ''}
+
+        ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')">
+          <div class="label">Biggest rivalry ↗</div>
+          <div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div>
+          <div class="sub">${biggestRivalry.total} matches together</div>
+        </div>` : ''}
+
+        ${bestStreak > 0 ? `<div class="gen-stat-card">
+          <div class="label">Longest win streak</div>
+          <div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div>
+          <div class="sub">${bestStreak} wins in a row</div>
+        </div>` : ''}
+
+        ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div>
+        <div class="gen-stat-card">${langStatsHTML}</div>` : ''}
+      `;
     }
 
     // Player selects for log tab
-    const playerOptions = data.players.map(p => `<option value="${p.name}">${getFlag(p.name)} ${p.name}</option>`).join('');
+    const playerOptions = data.players.map(p => `<option value="${p.name}">${getFlag(p.name)}${p.name}</option>`).join('');
     document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
     document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
 
@@ -548,11 +669,9 @@
             <button class="btn-small btn-save" onclick="saveEditMatch(${i})">Save</button>
           </div>`;
         }
-        const wFlag = getFlag(m.winner);
-        const lFlag = getFlag(m.loser);
         return `<div class="card">
           <div class="row">
-            <span style="font-size:14px"><span class="win">${wFlag} ${m.winner}</span> beat <span class="loss">${lFlag} ${m.loser}</span></span>
+            <span style="font-size:14px"><span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span></span>
             <div style="display:flex;gap:6px;align-items:center">
               <span style="color:#475569;font-size:12px">${m.date}</span>
               <div class="btn-actions">
@@ -589,7 +708,7 @@
         }
         return `<div class="card">
           <div class="row">
-            <span style="font-weight:700">${langObj ? langObj.flag : ''} ${p.name}</span>
+            <span style="font-weight:700">${langObj ? langObj.flag + ' ' : ''}${p.name}</span>
             <div style="display:flex;gap:10px;align-items:center">
               <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
               <div class="btn-actions">
