@@ -20,8 +20,12 @@
   .card.selected { border-color: #38bdf8; }
   input, select { width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: #f1f5f9; border: 1px solid #334155; font-size: 15px; margin-bottom: 16px; outline: none; }
   input:focus, select:focus { border-color: #38bdf8; }
-  .btn { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: opacity 0.2s; }
+  .btn { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: opacity 0.2s; margin-bottom: 10px; }
   .btn:hover { opacity: 0.9; }
+  .btn-outline { width: 100%; padding: 14px; background: transparent; color: #38bdf8; border: 2px solid #38bdf8; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+  .btn-outline:hover { background: #38bdf8; color: #0f172a; }
+  .btn-danger { width: 100%; padding: 14px; background: transparent; color: #ef4444; border: 2px solid #ef4444; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; transition: all 0.2s; margin-bottom: 10px; }
+  .btn-danger:hover { background: #ef4444; color: white; }
   .btn-small { padding: 6px 10px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: 700; }
   .btn-add { background: #38bdf8; color: #0f172a; }
   .btn-delete { background: #ef4444; color: white; }
@@ -34,7 +38,10 @@
   .h2h { margin-top: 12px; border-top: 1px solid #334155; padding-top: 12px; }
   .h2h p { color: #94a3b8; font-size: 13px; margin-bottom: 8px; }
   .h2h-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: #cbd5e1; }
-  .message { background: #1e40af; color: #bfdbfe; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; font-weight: 600; }
+  .message { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; font-weight: 600; }
+  .message.info { background: #1e40af; color: #bfdbfe; }
+  .message.success { background: #14532d; color: #86efac; }
+  .message.error { background: #7f1d1d; color: #fca5a5; }
   .empty { text-align: center; color: #94a3b8; padding: 40px; }
   .medal { font-size: 20px; margin-right: 8px; }
   .section-title { color: #38bdf8; font-size: 16px; margin-bottom: 12px; font-weight: 700; }
@@ -48,6 +55,11 @@
   .edit-row { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
   .edit-row select, .edit-row input { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
   .btn-actions { display: flex; gap: 6px; }
+  .divider { border: none; border-top: 1px solid #334155; margin: 20px 0; }
+  .stats-box { background: #0f172a; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-around; text-align: center; }
+  .stats-box div { display: flex; flex-direction: column; }
+  .stats-box span:first-child { font-size: 22px; font-weight: 800; color: #38bdf8; }
+  .stats-box span:last-child { font-size: 11px; color: #64748b; margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -55,7 +67,7 @@
   <h1>🎱 Game Stats</h1>
   <p class="subtitle">Track wins & losses with your colleagues</p>
 
-  <div id="message" class="message" style="display:none"></div>
+  <div id="message" class="message info" style="display:none"></div>
 
   <div class="nav">
     <button class="active" onclick="switchTab('dashboard', this)">📊 Stats</button>
@@ -66,6 +78,7 @@
 
   <!-- STATS TAB -->
   <div id="tab-dashboard" class="tab active">
+    <div id="summary-box"></div>
     <div class="section-title">🏆 Leaderboard</div>
     <div id="leaderboard"></div>
   </div>
@@ -94,6 +107,18 @@
       <button class="btn-small btn-add" onclick="addPlayer()">Add</button>
     </div>
     <div id="player-list"></div>
+
+    <hr class="divider">
+    <div class="section-title">📤 Export & Import</div>
+
+    <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
+    <label for="importFile" class="btn-outline" style="display:block; text-align:center; cursor:pointer; padding:14px; border-radius:10px; border: 2px solid #38bdf8; color:#38bdf8; font-weight:800; font-size:16px; margin-bottom:10px;">
+      📥 Import Data
+    </label>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+
+    <hr class="divider">
+    <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
   </div>
 </div>
 
@@ -107,12 +132,13 @@
     localStorage.setItem('gamestats', JSON.stringify(data));
   }
 
-  function showMessage(msg) {
+  function showMessage(msg, type = 'info') {
     const el = document.getElementById('message');
     el.textContent = msg;
+    el.className = 'message ' + type;
     el.style.display = 'block';
     clearTimeout(window._msgTimer);
-    window._msgTimer = setTimeout(() => el.style.display = 'none', 2500);
+    window._msgTimer = setTimeout(() => el.style.display = 'none', 3000);
   }
 
   function switchTab(tab, btn) {
@@ -143,12 +169,12 @@
     const name = document.getElementById('newPlayer').value.trim();
     if (!name) return;
     if (data.players.find(p => p.toLowerCase() === name.toLowerCase())) {
-      showMessage('Player already exists!'); return;
+      showMessage('Player already exists!', 'error'); return;
     }
     data.players.push(name);
     save();
     document.getElementById('newPlayer').value = '';
-    showMessage(name + ' added!');
+    showMessage(name + ' added!', 'success');
     render();
   }
 
@@ -173,11 +199,10 @@
   function saveEditPlayer(oldName) {
     const input = document.getElementById('edit-player-' + oldName);
     const newName = input.value.trim();
-    if (!newName) { showMessage('Name cannot be empty!'); return; }
+    if (!newName) { showMessage('Name cannot be empty!', 'error'); return; }
     if (newName.toLowerCase() !== oldName.toLowerCase() && data.players.find(p => p.toLowerCase() === newName.toLowerCase())) {
-      showMessage('Player already exists!'); return;
+      showMessage('Player already exists!', 'error'); return;
     }
-    // Update player name everywhere
     data.players = data.players.map(p => p === oldName ? newName : p);
     data.matches = data.matches.map(m => ({
       ...m,
@@ -186,7 +211,7 @@
     }));
     save();
     editingPlayer = null;
-    showMessage('Player renamed to ' + newName + '! ✅');
+    showMessage('Player renamed to ' + newName + '!', 'success');
     render();
   }
 
@@ -194,13 +219,13 @@
     const winner = document.getElementById('winner').value;
     const loser = document.getElementById('loser').value;
     if (!winner || !loser || winner === loser) {
-      showMessage('Pick two different players!'); return;
+      showMessage('Pick two different players!', 'error'); return;
     }
     data.matches.push({ winner, loser, date: new Date().toLocaleDateString() });
     save();
     document.getElementById('winner').value = '';
     document.getElementById('loser').value = '';
-    showMessage('Match logged! ✅');
+    showMessage('Match logged! ✅', 'success');
     render();
   }
 
@@ -221,13 +246,57 @@
     const newWinner = document.getElementById('edit-winner-' + index).value;
     const newLoser = document.getElementById('edit-loser-' + index).value;
     if (!newWinner || !newLoser || newWinner === newLoser) {
-      showMessage('Pick two different players!'); return;
+      showMessage('Pick two different players!', 'error'); return;
     }
     data.matches[index].winner = newWinner;
     data.matches[index].loser = newLoser;
     save();
     editingMatch = null;
-    showMessage('Match updated! ✅');
+    showMessage('Match updated!', 'success');
+    render();
+  }
+
+  function exportData() {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gamestats_' + new Date().toLocaleDateString().replace(/\//g, '-') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showMessage('Data exported successfully!', 'success');
+  }
+
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (!imported.players || !imported.matches) {
+          showMessage('Invalid file format!', 'error'); return;
+        }
+        if (!confirm('This will replace all current data. Are you sure?')) return;
+        data = imported;
+        save();
+        showMessage('Data imported successfully! ' + data.players.length + ' players, ' + data.matches.length + ' matches.', 'success');
+        render();
+      } catch(err) {
+        showMessage('Error reading file!', 'error');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  function resetData() {
+    if (!confirm('Reset ALL data? This cannot be undone!')) return;
+    if (!confirm('Are you absolutely sure? All players and matches will be deleted!')) return;
+    data = { players: [], matches: [] };
+    save();
+    showMessage('All data has been reset.', 'info');
     render();
   }
 
@@ -238,6 +307,14 @@
 
   function render() {
     const playerOptions = data.players.map(p => `<option value="${p}">${p}</option>`).join('');
+
+    // Summary box
+    const sb = document.getElementById('summary-box');
+    sb.innerHTML = `<div class="stats-box">
+      <div><span>${data.players.length}</span><span>Players</span></div>
+      <div><span>${data.matches.length}</span><span>Matches</span></div>
+      <div><span>${data.players.length > 0 ? (data.matches.length / data.players.length).toFixed(1) : 0}</span><span>Avg per player</span></div>
+    </div>`;
 
     // Leaderboard
     const sorted = [...data.players].sort((a, b) => {
@@ -280,7 +357,7 @@
       }).join('');
     }
 
-    // Player selects for log tab
+    // Player selects
     document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
     document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
 
