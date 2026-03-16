@@ -80,7 +80,6 @@
   .result-badge { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 800; }
   .result-win { background: #14532d; color: #4ade80; }
   .result-loss { background: #7f1d1d; color: #f87171; }
-  /* General stats section */
   .gen-stats { margin-top: 8px; }
   .gen-stats-title { color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px; }
   .gen-stat-card { background: #1e293b; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; }
@@ -89,21 +88,28 @@
   .gen-stat-card .sub { color: #94a3b8; font-size: 13px; margin-top: 2px; }
   .lang-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 14px; }
   .lang-stat-row:last-child { border-bottom: none; }
-  /* Unranked badge */
   .unranked { background: #334155; color: #64748b; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
-  /* Min matches setting */
   .setting-row { display: flex; justify-content: space-between; align-items: center; background: #1e293b; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; }
   .setting-row label { color: #94a3b8; font-size: 13px; margin: 0; }
   .setting-row input[type=number] { width: 60px; padding: 6px 8px; font-size: 14px; margin: 0; text-align: center; }
+  .sync-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; justify-content: center; margin-bottom: 16px; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .sync-dot.syncing { background: #f59e0b; animation: pulse 1s infinite; }
+  .sync-dot.error { background: #ef4444; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .loading { text-align: center; color: #94a3b8; padding: 60px 20px; font-size: 16px; }
 </style>
 </head>
 <body>
 <div class="container">
 
-  <!-- MAIN APP -->
   <div id="main-app">
     <h1>🎱 Game Stats</h1>
     <p class="subtitle">Track wins & losses with your colleagues</p>
+    <div id="sync-status" class="sync-indicator">
+      <div class="sync-dot syncing" id="sync-dot"></div>
+      <span id="sync-text">Connecting...</span>
+    </div>
     <div id="message" class="message info" style="display:none"></div>
     <div class="nav">
       <button class="active" onclick="switchTab('dashboard', this)">📊 Stats</button>
@@ -115,7 +121,7 @@
     <div id="tab-dashboard" class="tab active">
       <div class="lang-filter" id="lang-filter"></div>
       <div class="section-title">🏆 Leaderboard</div>
-      <div id="leaderboard"></div>
+      <div id="leaderboard"><div class="loading">Loading data...</div></div>
       <div id="general-stats" class="gen-stats"></div>
     </div>
 
@@ -143,24 +149,21 @@
         <label style="margin-bottom:6px;">Language team</label>
         <select id="newPlayerLang" style="margin-bottom:0">
           <option value="">No language</option>
-          <option value="en">🇬🇧 English</option>
-          <option value="it">🇮🇹 Italian</option>
-          <option value="fr">🇫🇷 French</option>
-          <option value="de">🇩🇪 German</option>
-          <option value="pt">🇵🇹 Portuguese</option>
+          <option value="en">English</option>
+          <option value="it">Italian</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="pt">Portuguese</option>
         </select>
       </div>
-
       <div class="section-title">Players</div>
       <div id="player-list"></div>
-
       <hr class="divider">
       <div class="section-title">⚙️ Settings</div>
       <div class="setting-row">
         <label>Min matches to appear in leaderboard</label>
         <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
       </div>
-
       <hr class="divider">
       <div class="section-title">📤 Export & Import</div>
       <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
@@ -171,7 +174,6 @@
     </div>
   </div>
 
-  <!-- H2H SCREEN -->
   <div id="h2h-screen" class="screen">
     <button class="btn-back" onclick="closeH2H()">← Back to Leaderboard</button>
     <div id="h2h-content"></div>
@@ -179,64 +181,125 @@
 
 </div>
 
-<script>
-  const LANGUAGES = [
-  { code: 'en', label: 'English', flag: '🇬🇧', country: 'gb' },
-  { code: 'it', label: 'Italian', flag: '🇮🇹', country: 'it' },
-  { code: 'fr', label: 'French', flag: '🇫🇷', country: 'fr' },
-  { code: 'de', label: 'German', flag: '🇩🇪', country: 'de' },
-  { code: 'pt', label: 'Portuguese', flag: '🇵🇹', country: 'pt' },
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ============================================
+// REPLACE THESE WITH YOUR FIREBASE VALUES
+// ============================================
+const firebaseConfig = {
+  apiKey: "AIzaSyC4FQBnDaGKu_goi2V1aVYNPjTUAgvpDCc",
+  authDomain: "gamestats-firebase.firebaseapp.com",
+  projectId: "gamestats-firebase",
+  storageBucket: "gamestats-firebase.firebasestorage.app",
+  messagingSenderId: "767922445574",
+  appId: "G-0J4XXBKZ4B"
+};
+// ============================================
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const dataRef = doc(db, 'gamestats', 'data');
+const settingsRef = doc(db, 'gamestats', 'settings');
+
+const LANGUAGES = [
+  { code: 'en', label: 'English', country: 'gb' },
+  { code: 'it', label: 'Italian', country: 'it' },
+  { code: 'fr', label: 'French', country: 'fr' },
+  { code: 'de', label: 'German', country: 'de' },
+  { code: 'pt', label: 'Portuguese', country: 'pt' },
 ];
 
-  let data = JSON.parse(localStorage.getItem('gamestats') || '{"players":[],"matches":[]}');
-  let settings = JSON.parse(localStorage.getItem('gamestats_settings') || '{"minMatches":0}');
-  data.players = data.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+let data = { players: [], matches: [] };
+let settings = { minMatches: 0 };
+let editingMatch = null;
+let editingPlayer = null;
+let selectedPlayer = null;
+let activeLang = 'all';
+let isSaving = false;
 
-  let editingMatch = null;
-  let editingPlayer = null;
-  let selectedPlayer = null;
-  let activeLang = 'all';
-
-  function save() { localStorage.setItem('gamestats', JSON.stringify(data)); }
-  function saveSettings() {
-    settings.minMatches = parseInt(document.getElementById('minMatchesSetting').value) || 0;
-    localStorage.setItem('gamestats_settings', JSON.stringify(settings));
-    render();
-  }
-
-  function showMessage(msg, type = 'info') {
-    const el = document.getElementById('message');
-    el.textContent = msg;
-    el.className = 'message ' + type;
-    el.style.display = 'block';
-    clearTimeout(window._msgTimer);
-    window._msgTimer = setTimeout(() => el.style.display = 'none', 3000);
-  }
-
-  function switchTab(tab, btn) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + tab).classList.add('active');
-    btn.classList.add('active');
-    editingMatch = null;
-    editingPlayer = null;
-    if (tab === 'players') {
-      setTimeout(() => {
-        document.getElementById('minMatchesSetting').value = settings.minMatches;
-      }, 50);
-    }
-    render();
-  }
-
-  function getPlayerObj(name) { return data.players.find(p => p.name === name); }
-
-  function flagImg(code) {
-  if (!code) return '';
-  const country = { en: 'gb', it: 'it', fr: 'fr', de: 'de', pt: 'pt' };
-  const c = country[code];
-  if (!c) return '';
-  return `<img src="https://flagcdn.com/20x15/${c}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${c}">`;
+function setSyncStatus(state) {
+  const dot = document.getElementById('sync-dot');
+  const text = document.getElementById('sync-text');
+  if (state === 'live') { dot.className = 'sync-dot'; text.textContent = 'Live — data shared with everyone'; }
+  else if (state === 'syncing') { dot.className = 'sync-dot syncing'; text.textContent = 'Saving...'; }
+  else if (state === 'error') { dot.className = 'sync-dot error'; text.textContent = 'Connection error'; }
+  else if (state === 'connecting') { dot.className = 'sync-dot syncing'; text.textContent = 'Connecting...'; }
 }
+
+async function save() {
+  isSaving = true;
+  setSyncStatus('syncing');
+  try {
+    await setDoc(dataRef, { players: data.players, matches: data.matches });
+    setSyncStatus('live');
+  } catch(e) {
+    setSyncStatus('error');
+    showMessage('Error saving data!', 'error');
+  }
+  isSaving = false;
+}
+
+async function saveSettings() {
+  settings.minMatches = parseInt(document.getElementById('minMatchesSetting').value) || 0;
+  await setDoc(settingsRef, settings);
+  render();
+}
+
+// Listen for real-time updates from Firebase
+onSnapshot(dataRef, (snap) => {
+  if (snap.exists()) {
+    const d = snap.data();
+    data.players = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+    data.matches = d.matches || [];
+  } else {
+    data = { players: [], matches: [] };
+  }
+  setSyncStatus('live');
+  render();
+}, (error) => {
+  setSyncStatus('error');
+});
+
+onSnapshot(settingsRef, (snap) => {
+  if (snap.exists()) {
+    settings = snap.data();
+    const el = document.getElementById('minMatchesSetting');
+    if (el) el.value = settings.minMatches || 0;
+  }
+});
+
+function showMessage(msg, type = 'info') {
+  const el = document.getElementById('message');
+  el.textContent = msg;
+  el.className = 'message ' + type;
+  el.style.display = 'block';
+  clearTimeout(window._msgTimer);
+  window._msgTimer = setTimeout(() => el.style.display = 'none', 3000);
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  editingMatch = null;
+  editingPlayer = null;
+  if (tab === 'players') {
+    setTimeout(() => { document.getElementById('minMatchesSetting').value = settings.minMatches || 0; }, 50);
+  }
+  render();
+}
+
+function flagImg(code) {
+  if (!code) return '';
+  const l = LANGUAGES.find(l => l.code === code);
+  if (!l) return '';
+  return `<img src="https://flagcdn.com/20x15/${l.country}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${l.label}">`;
+}
+
+function getPlayerObj(name) { return data.players.find(p => p.name === name); }
 
 function getFlag(name) {
   const p = getPlayerObj(name);
@@ -244,493 +307,463 @@ function getFlag(name) {
   return flagImg(p.lang);
 }
 
-  function getStats(name) {
-    const wins = data.matches.filter(m => m.winner === name).length;
-    const losses = data.matches.filter(m => m.loser === name).length;
-    const total = wins + losses;
-    const pct = total === 0 ? 0 : Math.round((wins / total) * 100);
-    return { wins, losses, total, pct };
+function getStats(name) {
+  const wins = data.matches.filter(m => m.winner === name).length;
+  const losses = data.matches.filter(m => m.loser === name).length;
+  const total = wins + losses;
+  const pct = total === 0 ? 0 : Math.round((wins / total) * 100);
+  return { wins, losses, total, pct };
+}
+
+function getH2H(p1, p2) {
+  const p1wins = data.matches.filter(m => m.winner === p1 && m.loser === p2).length;
+  const p2wins = data.matches.filter(m => m.winner === p2 && m.loser === p1).length;
+  const total = p1wins + p2wins;
+  const pct = total === 0 ? 0 : Math.round((p1wins / total) * 100);
+  return { p1wins, p2wins, total, pct };
+}
+
+window.addPlayer = async function() {
+  const name = document.getElementById('newPlayer').value.trim();
+  const lang = document.getElementById('newPlayerLang').value;
+  if (!name) return;
+  if (data.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showMessage('Player already exists!', 'error'); return;
   }
+  data.players.push({ name, lang });
+  await save();
+  document.getElementById('newPlayer').value = '';
+  document.getElementById('newPlayerLang').value = '';
+  showMessage(name + ' added!', 'success');
+}
 
-  function getH2H(p1, p2) {
-    const p1wins = data.matches.filter(m => m.winner === p1 && m.loser === p2).length;
-    const p2wins = data.matches.filter(m => m.winner === p2 && m.loser === p1).length;
-    const total = p1wins + p2wins;
-    const pct = total === 0 ? 0 : Math.round((p1wins / total) * 100);
-    return { p1wins, p2wins, total, pct };
+window.deletePlayer = async function(name) {
+  if (!confirm('Delete ' + name + '?')) return;
+  data.players = data.players.filter(p => p.name !== name);
+  await save();
+}
+
+window.startEditPlayer = function(name) {
+  editingPlayer = editingPlayer === name ? null : name;
+  render();
+  if (editingPlayer) {
+    setTimeout(() => {
+      const input = document.getElementById('edit-player-' + name);
+      if (input) { input.focus(); input.select(); }
+    }, 50);
   }
+}
 
-  function addPlayer() {
-    const name = document.getElementById('newPlayer').value.trim();
-    const lang = document.getElementById('newPlayerLang').value;
-    if (!name) return;
-    if (data.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
-      showMessage('Player already exists!', 'error'); return;
-    }
-    data.players.push({ name, lang });
-    save();
-    document.getElementById('newPlayer').value = '';
-    document.getElementById('newPlayerLang').value = '';
-    showMessage(name + ' added!', 'success');
-    render();
+window.saveEditPlayer = async function(oldName) {
+  const input = document.getElementById('edit-player-' + oldName);
+  const langSelect = document.getElementById('edit-lang-' + oldName);
+  const newName = input.value.trim();
+  const newLang = langSelect.value;
+  if (!newName) { showMessage('Name cannot be empty!', 'error'); return; }
+  if (newName.toLowerCase() !== oldName.toLowerCase() && data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
+    showMessage('Player already exists!', 'error'); return;
   }
+  data.players = data.players.map(p => p.name === oldName ? { name: newName, lang: newLang } : p);
+  data.matches = data.matches.map(m => ({
+    ...m,
+    winner: m.winner === oldName ? newName : m.winner,
+    loser: m.loser === oldName ? newName : m.loser
+  }));
+  await save();
+  editingPlayer = null;
+  showMessage('Player updated!', 'success');
+}
 
-  function deletePlayer(name) {
-    if (!confirm('Delete ' + name + '?')) return;
-    data.players = data.players.filter(p => p.name !== name);
-    save(); render();
+window.logMatch = async function() {
+  const winner = document.getElementById('winner').value;
+  const loser = document.getElementById('loser').value;
+  if (!winner || !loser || winner === loser) {
+    showMessage('Pick two different players!', 'error'); return;
   }
+  data.matches.push({ winner, loser, date: new Date().toLocaleDateString() });
+  await save();
+  document.getElementById('winner').value = '';
+  document.getElementById('loser').value = '';
+  showMessage('Match logged! ✅', 'success');
+}
 
-  function startEditPlayer(name) {
-    editingPlayer = editingPlayer === name ? null : name;
-    render();
-    if (editingPlayer) {
-      setTimeout(() => {
-        const input = document.getElementById('edit-player-' + name);
-        if (input) { input.focus(); input.select(); }
-      }, 50);
-    }
+window.deleteMatch = async function(index) {
+  if (!confirm('Delete this match?')) return;
+  data.matches.splice(index, 1);
+  await save();
+  editingMatch = null;
+}
+
+window.startEditMatch = function(index) {
+  editingMatch = editingMatch === index ? null : index;
+  render();
+}
+
+window.saveEditMatch = async function(index) {
+  const newWinner = document.getElementById('edit-winner-' + index).value;
+  const newLoser = document.getElementById('edit-loser-' + index).value;
+  if (!newWinner || !newLoser || newWinner === newLoser) {
+    showMessage('Pick two different players!', 'error'); return;
   }
+  data.matches[index].winner = newWinner;
+  data.matches[index].loser = newLoser;
+  await save();
+  editingMatch = null;
+  showMessage('Match updated!', 'success');
+}
 
-  function saveEditPlayer(oldName) {
-    const input = document.getElementById('edit-player-' + oldName);
-    const langSelect = document.getElementById('edit-lang-' + oldName);
-    const newName = input.value.trim();
-    const newLang = langSelect.value;
-    if (!newName) { showMessage('Name cannot be empty!', 'error'); return; }
-    if (newName.toLowerCase() !== oldName.toLowerCase() && data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
-      showMessage('Player already exists!', 'error'); return;
-    }
-    data.players = data.players.map(p => p.name === oldName ? { name: newName, lang: newLang } : p);
-    data.matches = data.matches.map(m => ({
-      ...m,
-      winner: m.winner === oldName ? newName : m.winner,
-      loser: m.loser === oldName ? newName : m.loser
-    }));
-    save(); editingPlayer = null;
-    showMessage('Player updated!', 'success'); render();
-  }
+window.openH2H = function(p1, p2) {
+  selectedPlayer = null;
+  const h = getH2H(p1, p2);
+  const matches = data.matches.filter(m =>
+    (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
+  ).reverse();
 
-  function logMatch() {
-    const winner = document.getElementById('winner').value;
-    const loser = document.getElementById('loser').value;
-    if (!winner || !loser || winner === loser) {
-      showMessage('Pick two different players!', 'error'); return;
-    }
-    data.matches.push({ winner, loser, date: new Date().toLocaleDateString() });
-    save();
-    document.getElementById('winner').value = '';
-    document.getElementById('loser').value = '';
-    showMessage('Match logged! ✅', 'success'); render();
-  }
+  const historyHTML = matches.length === 0
+    ? '<div class="empty">No matches between these players yet.</div>'
+    : matches.map(m => {
+        const isP1Win = m.winner === p1;
+        return `<div class="match-history-item">
+          <span style="color:#94a3b8;font-size:12px">${m.date}</span>
+          <span><span class="${isP1Win ? 'win' : 'loss'}">${getFlag(m.winner)}${m.winner}</span> beat <span class="${isP1Win ? 'loss' : 'win'}">${getFlag(m.loser)}${m.loser}</span></span>
+          <span class="result-badge ${isP1Win ? 'result-win' : 'result-loss'}">${isP1Win ? 'W' : 'L'}</span>
+        </div>`;
+      }).join('');
 
-  function deleteMatch(index) {
-    if (!confirm('Delete this match?')) return;
-    data.matches.splice(index, 1);
-    save(); editingMatch = null; render();
-  }
-
-  function startEditMatch(index) {
-    editingMatch = editingMatch === index ? null : index;
-    render();
-  }
-
-  function saveEditMatch(index) {
-    const newWinner = document.getElementById('edit-winner-' + index).value;
-    const newLoser = document.getElementById('edit-loser-' + index).value;
-    if (!newWinner || !newLoser || newWinner === newLoser) {
-      showMessage('Pick two different players!', 'error'); return;
-    }
-    data.matches[index].winner = newWinner;
-    data.matches[index].loser = newLoser;
-    save(); editingMatch = null;
-    showMessage('Match updated!', 'success'); render();
-  }
-
-  function openH2H(p1, p2) {
-    selectedPlayer = null;
-    const h = getH2H(p1, p2);
-    const p1flag = getFlag(p1);
-    const p2flag = getFlag(p2);
-    const matches = data.matches.filter(m =>
-      (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
-    ).reverse();
-
-    const historyHTML = matches.length === 0
-      ? '<div class="empty">No matches between these players yet.</div>'
-      : matches.map(m => {
-          const isP1Win = m.winner === p1;
-          return `<div class="match-history-item">
-            <span style="color:#94a3b8;font-size:12px">${m.date}</span>
-            <span><span class="${isP1Win ? 'win' : 'loss'}">${getFlag(m.winner)}${m.winner}</span> beat <span class="${isP1Win ? 'loss' : 'win'}">${getFlag(m.loser)}${m.loser}</span></span>
-            <span class="result-badge ${isP1Win ? 'result-win' : 'result-loss'}">${isP1Win ? 'W' : 'L'}</span>
-          </div>`;
-        }).join('');
-
-    document.getElementById('h2h-content').innerHTML = `
-      <div class="h2h-header">
-        <div class="h2h-header-names">
-          <div class="h2h-header-player">
-            <span>${p1flag}${p1}</span>
-            <span>${h.p1wins} wins</span>
-          </div>
-          <div class="h2h-vs">VS</div>
-          <div class="h2h-header-player">
-            <span>${p2flag}${p2}</span>
-            <span>${h.p2wins} wins</span>
-          </div>
+  document.getElementById('h2h-content').innerHTML = `
+    <div class="h2h-header">
+      <div class="h2h-header-names">
+        <div class="h2h-header-player">
+          <span>${getFlag(p1)}${p1}</span>
+          <span>${h.p1wins} wins</span>
         </div>
-        <div class="h2h-score">
-          <div class="h2h-score-item"><span class="win">${h.p1wins}</span><span>Wins</span></div>
-          <div class="h2h-score-item"><span style="color:#94a3b8">${h.total}</span><span>Total</span></div>
-          <div class="h2h-score-item"><span class="loss">${h.p2wins}</span><span>Wins</span></div>
+        <div class="h2h-vs">VS</div>
+        <div class="h2h-header-player">
+          <span>${getFlag(p2)}${p2}</span>
+          <span>${h.p2wins} wins</span>
         </div>
       </div>
-      <div class="section-title">Match History</div>
-      <div class="card">${historyHTML}</div>`;
+      <div class="h2h-score">
+        <div class="h2h-score-item"><span class="win">${h.p1wins}</span><span>Wins</span></div>
+        <div class="h2h-score-item"><span style="color:#94a3b8">${h.total}</span><span>Total</span></div>
+        <div class="h2h-score-item"><span class="loss">${h.p2wins}</span><span>Wins</span></div>
+      </div>
+    </div>
+    <div class="section-title">Match History</div>
+    <div class="card">${historyHTML}</div>`;
 
-    document.getElementById('main-app').style.display = 'none';
-    document.getElementById('h2h-screen').classList.add('active');
-  }
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('h2h-screen').classList.add('active');
+}
 
-  function closeH2H() {
-    document.getElementById('h2h-screen').classList.remove('active');
-    document.getElementById('main-app').style.display = 'block';
-    render();
-  }
+window.closeH2H = function() {
+  document.getElementById('h2h-screen').classList.remove('active');
+  document.getElementById('main-app').style.display = 'block';
+  render();
+}
 
-  function togglePlayer(name) {
-    selectedPlayer = selectedPlayer === name ? null : name;
-    render();
-  }
+window.togglePlayer = function(name) {
+  selectedPlayer = selectedPlayer === name ? null : name;
+  render();
+}
 
-  function exportData() {
-    const json = JSON.stringify(data, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'gamestats_' + new Date().toLocaleDateString().replace(/\//g, '-') + '.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    showMessage('Data exported!', 'success');
-  }
+window.setLangFilter = function(lang) {
+  activeLang = lang;
+  selectedPlayer = null;
+  render();
+}
 
-  function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (!imported.players || !imported.matches) { showMessage('Invalid file!', 'error'); return; }
-        if (!confirm('This will replace all current data. Are you sure?')) return;
-        data = imported;
-        data.players = data.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
-        save();
-        showMessage('Imported! ' + data.players.length + ' players, ' + data.matches.length + ' matches.', 'success');
-        render();
-      } catch(err) { showMessage('Error reading file!', 'error'); }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-  }
+window.exportData = function() {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'gamestats_' + new Date().toLocaleDateString().replace(/\//g, '-') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showMessage('Data exported!', 'success');
+}
 
-  function resetData() {
-    if (!confirm('Reset ALL data? This cannot be undone!')) return;
-    if (!confirm('Are you absolutely sure?')) return;
-    data = { players: [], matches: [] };
-    save(); showMessage('All data reset.', 'info'); render();
-  }
+window.importData = async function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!imported.players || !imported.matches) { showMessage('Invalid file!', 'error'); return; }
+      if (!confirm('This will replace all current data. Are you sure?')) return;
+      data = imported;
+      data.players = data.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+      await save();
+      showMessage('Imported! ' + data.players.length + ' players, ' + data.matches.length + ' matches.', 'success');
+    } catch(err) { showMessage('Error reading file!', 'error'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
 
-  function setLangFilter(lang) {
-    activeLang = lang;
-    selectedPlayer = null;
-    render();
-  }
+window.resetData = async function() {
+  if (!confirm('Reset ALL data? This cannot be undone!')) return;
+  if (!confirm('Are you absolutely sure?')) return;
+  data = { players: [], matches: [] };
+  await save();
+  showMessage('All data reset.', 'info');
+}
 
-  function getLongestWinStreak(name) {
-    let best = 0, current = 0;
-    data.matches.forEach(m => {
-      if (m.winner === name) { current++; best = Math.max(best, current); }
-      else if (m.loser === name) { current = 0; }
-    });
-    return best;
-  }
+window.saveSettings = saveSettings;
 
-  function render() {
-    const playerNames = data.players.map(p => p.name);
+function getLongestWinStreak(name) {
+  let best = 0, current = 0;
+  data.matches.forEach(m => {
+    if (m.winner === name) { current++; best = Math.max(best, current); }
+    else if (m.loser === name) { current = 0; }
+  });
+  return best;
+}
 
-    // Language filter
-    const lf = document.getElementById('lang-filter');
-    const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
-    const langBtns = LANGUAGES.map(l =>
-  `<button class="lang-btn ${activeLang === l.code ? 'active' : ''}" onclick="setLangFilter('${l.code}')"><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">${l.label}</button>`
-).join('');
-    lf.innerHTML = allBtn + langBtns;
+function render() {
+  const playerNames = data.players.map(p => p.name);
 
-    // Filter players
-    const filteredPlayers = activeLang === 'all'
-      ? data.players
-      : data.players.filter(p => p.lang === activeLang);
+  const lf = document.getElementById('lang-filter');
+  const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
+  const langBtns = LANGUAGES.map(l =>
+    `<button class="lang-btn ${activeLang === l.code ? 'active' : ''}" onclick="setLangFilter('${l.code}')"><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">${l.label}</button>`
+  ).join('');
+  lf.innerHTML = allBtn + langBtns;
 
-    // Sort: ranked players first (by win%, then wins), then unranked
-    const minM = settings.minMatches || 0;
-    const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
-    const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
+  const filteredPlayers = activeLang === 'all'
+    ? data.players
+    : data.players.filter(p => p.lang === activeLang);
 
-    const sortByStats = (a, b) => {
-      const sa = getStats(a.name), sb = getStats(b.name);
-      return sb.pct - sa.pct || sb.wins - sa.wins || sb.total - sa.total;
-    };
-    ranked.sort(sortByStats);
+  const minM = settings.minMatches || 0;
+  const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
+  const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
 
-    const lb = document.getElementById('leaderboard');
-    if (filteredPlayers.length === 0) {
-      lb.innerHTML = '<div class="empty">No players found.</div>';
-    } else {
-      const medals = ['🥇', '🥈', '🥉'];
-      const rankedHTML = ranked.map((p, i) => {
+  ranked.sort((a, b) => {
+    const sa = getStats(a.name), sb = getStats(b.name);
+    return sb.pct - sa.pct || sb.wins - sa.wins || sb.total - sa.total;
+  });
+
+  const lb = document.getElementById('leaderboard');
+  if (filteredPlayers.length === 0) {
+    lb.innerHTML = '<div class="empty">No players found.</div>';
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    const rankedHTML = ranked.map((p, i) => {
+      const s = getStats(p.name);
+      const isSelected = selectedPlayer === p.name;
+      const flag = getFlag(p.name);
+      let dropdown = '';
+      if (isSelected) {
+        const overallHTML = `<div class="h2h-overall">
+          <div><span class="win">${s.wins}</span><span>Wins</span></div>
+          <div><span style="color:#f1f5f9">${s.total}</span><span>Total</span></div>
+          <div><span class="loss">${s.losses}</span><span>Losses</span></div>
+          <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
+        </div>`;
+        const opponents = playerNames
+          .filter(op => op !== p.name)
+          .map(op => ({ name: op, ...getH2H(p.name, op) }))
+          .filter(op => op.total > 0)
+          .sort((a, b) => b.total - a.total);
+        const opponentsHTML = opponents.length === 0
+          ? '<div style="color:#475569;font-size:13px;text-align:center;padding:8px">No matches yet</div>'
+          : opponents.map(op => {
+              return `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
+                <div class="h2h-opponent-name">${getFlag(op.name)}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
+                <div class="h2h-opponent-stats">
+                  <span class="win">${op.p1wins}W</span>
+                  <span class="loss">${op.p2wins}L</span>
+                  <span class="pct">${op.pct}%</span>
+                </div>
+              </div>`;
+            }).join('');
+        dropdown = `<div class="h2h-dropdown">
+          ${overallHTML}
+          <div style="color:#94a3b8;font-size:12px;margin-bottom:8px">Head to head — tap to see full history</div>
+          ${opponentsHTML}
+        </div>`;
+      }
+      return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer('${p.name}')">
+        <div class="row">
+          <div style="display:flex;align-items:center">
+            <span class="medal">${medals[i] || (i + 1) + '.'}</span>
+            <span style="font-weight:700;font-size:16px">${flag}${p.name}</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span class="win">${s.wins}W</span>
+            <span class="loss">${s.losses}L</span>
+            <span class="pct">${s.pct}%</span>
+          </div>
+        </div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%"></div></div>
+        ${dropdown}
+      </div>`;
+    }).join('');
+
+    const unrankedHTML = unranked.length === 0 ? '' :
+      `<div style="color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;">Unranked (less than ${minM} match${minM !== 1 ? 'es' : ''})</div>` +
+      unranked.map(p => {
         const s = getStats(p.name);
-        const isSelected = selectedPlayer === p.name;
-        const flag = getFlag(p.name);
-
-        let dropdown = '';
-        if (isSelected) {
-          const overallHTML = `<div class="h2h-overall">
-            <div><span class="win">${s.wins}</span><span>Wins</span></div>
-            <div><span style="color:#f1f5f9">${s.total}</span><span>Total</span></div>
-            <div><span class="loss">${s.losses}</span><span>Losses</span></div>
-            <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
-          </div>`;
-
-          const opponents = playerNames
-            .filter(op => op !== p.name)
-            .map(op => ({ name: op, ...getH2H(p.name, op) }))
-            .filter(op => op.total > 0)
-            .sort((a, b) => b.total - a.total);
-
-          const opponentsHTML = opponents.length === 0
-            ? '<div style="color:#475569;font-size:13px;text-align:center;padding:8px">No matches yet</div>'
-            : opponents.map(op => {
-                const opFlag = getFlag(op.name);
-                return `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
-                  <div class="h2h-opponent-name">${opFlag}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
-                  <div class="h2h-opponent-stats">
-                    <span class="win">${op.p1wins}W</span>
-                    <span class="loss">${op.p2wins}L</span>
-                    <span class="pct">${op.pct}%</span>
-                  </div>
-                </div>`;
-              }).join('');
-
-          dropdown = `<div class="h2h-dropdown">
-            ${overallHTML}
-            <div style="color:#94a3b8;font-size:12px;margin-bottom:8px">Head to head — tap to see full history</div>
-            ${opponentsHTML}
-          </div>`;
-        }
-
-        return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer('${p.name}')">
+        return `<div class="card" style="opacity:0.6">
           <div class="row">
-            <div style="display:flex;align-items:center">
-              <span class="medal">${medals[i] || (i + 1) + '.'}</span>
-              <span style="font-weight:700;font-size:16px">${flag}${p.name}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="unranked">—</span>
+              <span style="font-weight:700">${getFlag(p.name)}${p.name}</span>
             </div>
             <div style="display:flex;gap:10px;align-items:center">
               <span class="win">${s.wins}W</span>
               <span class="loss">${s.losses}L</span>
-              <span class="pct">${s.pct}%</span>
+              <span style="color:#475569;font-size:12px">${s.total} played</span>
             </div>
           </div>
-          <div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%"></div></div>
-          ${dropdown}
         </div>`;
       }).join('');
 
-      const unrankedHTML = unranked.length === 0 ? '' :
-        `<div style="color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;">Unranked (less than ${minM} match${minM !== 1 ? 'es' : ''})</div>` +
-        unranked.map(p => {
-          const s = getStats(p.name);
-          const flag = getFlag(p.name);
-          return `<div class="card" style="opacity:0.6">
-            <div class="row">
-              <div style="display:flex;align-items:center;gap:8px">
-                <span class="unranked">—</span>
-                <span style="font-weight:700">${flag}${p.name}</span>
-              </div>
-              <div style="display:flex;gap:10px;align-items:center">
-                <span class="win">${s.wins}W</span>
-                <span class="loss">${s.losses}L</span>
-                <span style="color:#475569;font-size:12px">${s.total} played</span>
-              </div>
-            </div>
-          </div>`;
-        }).join('');
-
-      lb.innerHTML = rankedHTML + unrankedHTML;
-    }
-
-    // General stats at bottom
-    const gs = document.getElementById('general-stats');
-
-    if (data.matches.length === 0) {
-      gs.innerHTML = '';
-    } else {
-      // Most active player
-      const mostActive = [...data.players].sort((a, b) => getStats(b.name).total - getStats(a.name).total)[0];
-
-      // Biggest rivalry
-      let biggestRivalry = null, maxRivalMatches = 0;
-      for (let i = 0; i < data.players.length; i++) {
-        for (let j = i + 1; j < data.players.length; j++) {
-          const h = getH2H(data.players[i].name, data.players[j].name);
-          if (h.total > maxRivalMatches) {
-            maxRivalMatches = h.total;
-            biggestRivalry = { p1: data.players[i].name, p2: data.players[j].name, ...h };
-          }
-        }
-      }
-
-      // Longest win streak across all players
-      let bestStreakPlayer = '', bestStreak = 0;
-      data.players.forEach(p => {
-        const s = getLongestWinStreak(p.name);
-        if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; }
-      });
-
-      // Stats per language
-      const langStatsHTML = LANGUAGES.map(l => {
-        const lPlayers = data.players.filter(p => p.lang === l.code);
-        if (lPlayers.length === 0) return '';
-        const lNames = lPlayers.map(p => p.name);
-        const lMatches = data.matches.filter(m => lNames.includes(m.winner) || lNames.includes(m.loser));
-        const lWins = data.matches.filter(m => lNames.includes(m.winner)).length;
-        const lTotal = lMatches.length;
-        const lWinRate = lTotal === 0 ? 0 : Math.round((lWins / lTotal) * 100);
-        return `<div class="lang-stat-row">
-          <span>${l.flag} ${l.label}</span>
-          <span style="display:flex;gap:12px;font-size:13px">
-            <span style="color:#94a3b8">${lPlayers.length} players</span>
-            <span style="color:#94a3b8">${lMatches.length} matches</span>
-            <span class="pct">${lWinRate}%</span>
-          </span>
-        </div>`;
-      }).filter(Boolean).join('');
-
-      gs.innerHTML = `
-        <div class="gen-stats-title">🔢 General Stats</div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div class="gen-stat-card">
-            <div class="label">Total matches</div>
-            <div class="value">${data.matches.length}</div>
-          </div>
-          <div class="gen-stat-card">
-            <div class="label">Total players</div>
-            <div class="value">${data.players.length}</div>
-          </div>
-        </div>
-
-        ${mostActive ? `<div class="gen-stat-card">
-          <div class="label">Most active player</div>
-          <div class="value">${getFlag(mostActive.name)}${mostActive.name}</div>
-          <div class="sub">${getStats(mostActive.name).total} matches played</div>
-        </div>` : ''}
-
-        ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')">
-          <div class="label">Biggest rivalry ↗</div>
-          <div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div>
-          <div class="sub">${biggestRivalry.total} matches together</div>
-        </div>` : ''}
-
-        ${bestStreak > 0 ? `<div class="gen-stat-card">
-          <div class="label">Longest win streak</div>
-          <div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div>
-          <div class="sub">${bestStreak} wins in a row</div>
-        </div>` : ''}
-
-        ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div>
-        <div class="gen-stat-card">${langStatsHTML}</div>` : ''}
-      `;
-    }
-
-    // Player selects for log tab
-    const playerOptions = data.players.map(p => `<option value="${p.name}">${getFlag(p.name)}${p.name}</option>`).join('');
-    document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
-    document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
-
-    // History
-    const hl = document.getElementById('history-list');
-    if (data.matches.length === 0) {
-      hl.innerHTML = '<div class="empty">No matches logged yet!</div>';
-    } else {
-      hl.innerHTML = [...data.matches].reverse().map((m, ri) => {
-        const i = data.matches.length - 1 - ri;
-        const isEditing = editingMatch === i;
-        let editSection = '';
-        if (isEditing) {
-          editSection = `<div class="edit-row">
-            <select id="edit-winner-${i}">${data.players.map(p => `<option value="${p.name}" ${p.name === m.winner ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
-            <select id="edit-loser-${i}">${data.players.map(p => `<option value="${p.name}" ${p.name === m.loser ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
-            <button class="btn-small btn-save" onclick="saveEditMatch(${i})">Save</button>
-          </div>`;
-        }
-        return `<div class="card">
-          <div class="row">
-            <span style="font-size:14px"><span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span></span>
-            <div style="display:flex;gap:6px;align-items:center">
-              <span style="color:#475569;font-size:12px">${m.date}</span>
-              <div class="btn-actions">
-                <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
-                <button class="btn-small btn-delete" onclick="deleteMatch(${i})">🗑️</button>
-              </div>
-            </div>
-          </div>
-          ${editSection}
-        </div>`;
-      }).join('');
-    }
-
-    // Player list
-    const pl = document.getElementById('player-list');
-    if (data.players.length === 0) {
-      pl.innerHTML = '<div class="empty">No players yet!</div>';
-    } else {
-      pl.innerHTML = data.players.map(p => {
-        const s = getStats(p.name);
-        const isEditing = editingPlayer === p.name;
-        const langObj = LANGUAGES.find(l => l.code === p.lang);
-        let editSection = '';
-        if (isEditing) {
-          const langOptions = `<option value="">No language</option>` +
-            LANGUAGES.map(l => `<option value="${l.code}" ${p.lang === l.code ? 'selected' : ''}>${l.flag} ${l.label}</option>`).join('');
-          editSection = `<div class="edit-row" style="flex-direction:column;gap:8px">
-            <div style="display:flex;gap:6px">
-              <input id="edit-player-${p.name}" value="${p.name}" onkeydown="if(event.key==='Enter') saveEditPlayer('${p.name}')" style="margin-bottom:0">
-              <button class="btn-small btn-save" onclick="saveEditPlayer('${p.name}')">Save</button>
-            </div>
-            <select id="edit-lang-${p.name}" style="margin-bottom:0">${langOptions}</select>
-          </div>`;
-        }
-        return `<div class="card">
-          <div class="row">
-            <span style="font-weight:700">${langObj ? langObj.flag + ' ' : ''}${p.name}</span>
-            <div style="display:flex;gap:10px;align-items:center">
-              <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
-              <div class="btn-actions">
-                <button class="btn-small btn-edit" onclick="startEditPlayer('${p.name}')">✏️</button>
-                <button class="btn-small btn-delete" onclick="deletePlayer('${p.name}')">🗑️</button>
-              </div>
-            </div>
-          </div>
-          ${editSection}
-        </div>`;
-      }).join('');
-    }
+    lb.innerHTML = rankedHTML + unrankedHTML;
   }
 
-  render();
+  // General stats
+  const gs = document.getElementById('general-stats');
+  if (data.matches.length === 0) {
+    gs.innerHTML = '';
+  } else {
+    const mostActive = [...data.players].sort((a, b) => getStats(b.name).total - getStats(a.name).total)[0];
+    let biggestRivalry = null, maxRivalMatches = 0;
+    for (let i = 0; i < data.players.length; i++) {
+      for (let j = i + 1; j < data.players.length; j++) {
+        const h = getH2H(data.players[i].name, data.players[j].name);
+        if (h.total > maxRivalMatches) {
+          maxRivalMatches = h.total;
+          biggestRivalry = { p1: data.players[i].name, p2: data.players[j].name, ...h };
+        }
+      }
+    }
+    let bestStreakPlayer = '', bestStreak = 0;
+    data.players.forEach(p => {
+      const s = getLongestWinStreak(p.name);
+      if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; }
+    });
+    const langStatsHTML = LANGUAGES.map(l => {
+      const lPlayers = data.players.filter(p => p.lang === l.code);
+      if (lPlayers.length === 0) return '';
+      const lNames = lPlayers.map(p => p.name);
+      const lMatches = data.matches.filter(m => lNames.includes(m.winner) || lNames.includes(m.loser));
+      const lWins = data.matches.filter(m => lNames.includes(m.winner)).length;
+      const lTotal = lMatches.length;
+      const lWinRate = lTotal === 0 ? 0 : Math.round((lWins / lTotal) * 100);
+      return `<div class="lang-stat-row">
+        <span><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:6px;">${l.label}</span>
+        <span style="display:flex;gap:12px;font-size:13px">
+          <span style="color:#94a3b8">${lPlayers.length} players</span>
+          <span style="color:#94a3b8">${lMatches.length} matches</span>
+          <span class="pct">${lWinRate}%</span>
+        </span>
+      </div>`;
+    }).filter(Boolean).join('');
+
+    gs.innerHTML = `
+      <div class="gen-stats-title">🔢 General Stats</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${data.matches.length}</div></div>
+        <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
+      </div>
+      ${mostActive ? `<div class="gen-stat-card">
+        <div class="label">Most active player</div>
+        <div class="value">${getFlag(mostActive.name)}${mostActive.name}</div>
+        <div class="sub">${getStats(mostActive.name).total} matches played</div>
+      </div>` : ''}
+      ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')">
+        <div class="label">Biggest rivalry ↗</div>
+        <div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div>
+        <div class="sub">${biggestRivalry.total} matches together</div>
+      </div>` : ''}
+      ${bestStreak > 0 ? `<div class="gen-stat-card">
+        <div class="label">Longest win streak</div>
+        <div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div>
+        <div class="sub">${bestStreak} wins in a row</div>
+      </div>` : ''}
+      ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div><div class="gen-stat-card">${langStatsHTML}</div>` : ''}`;
+  }
+
+  // Player selects
+  const playerOptions = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+  document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
+  document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
+
+  // History
+  const hl = document.getElementById('history-list');
+  if (data.matches.length === 0) {
+    hl.innerHTML = '<div class="empty">No matches logged yet!</div>';
+  } else {
+    hl.innerHTML = [...data.matches].reverse().map((m, ri) => {
+      const i = data.matches.length - 1 - ri;
+      const isEditing = editingMatch === i;
+      let editSection = '';
+      if (isEditing) {
+        editSection = `<div class="edit-row">
+          <select id="edit-winner-${i}">${data.players.map(p => `<option value="${p.name}" ${p.name === m.winner ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
+          <select id="edit-loser-${i}">${data.players.map(p => `<option value="${p.name}" ${p.name === m.loser ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
+          <button class="btn-small btn-save" onclick="saveEditMatch(${i})">Save</button>
+        </div>`;
+      }
+      return `<div class="card">
+        <div class="row">
+          <span style="font-size:14px"><span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span></span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="color:#475569;font-size:12px">${m.date}</span>
+            <div class="btn-actions">
+              <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
+              <button class="btn-small btn-delete" onclick="deleteMatch(${i})">🗑️</button>
+            </div>
+          </div>
+        </div>
+        ${editSection}
+      </div>`;
+    }).join('');
+  }
+
+  // Players list
+  const pl = document.getElementById('player-list');
+  if (data.players.length === 0) {
+    pl.innerHTML = '<div class="empty">No players yet!</div>';
+  } else {
+    pl.innerHTML = data.players.map(p => {
+      const s = getStats(p.name);
+      const isEditing = editingPlayer === p.name;
+      const langObj = LANGUAGES.find(l => l.code === p.lang);
+      let editSection = '';
+      if (isEditing) {
+        const langOptions = `<option value="">No language</option>` +
+          LANGUAGES.map(l => `<option value="${l.code}" ${p.lang === l.code ? 'selected' : ''}>${l.label}</option>`).join('');
+        editSection = `<div class="edit-row" style="flex-direction:column;gap:8px">
+          <div style="display:flex;gap:6px">
+            <input id="edit-player-${p.name}" value="${p.name}" onkeydown="if(event.key==='Enter') saveEditPlayer('${p.name}')" style="margin-bottom:0">
+            <button class="btn-small btn-save" onclick="saveEditPlayer('${p.name}')">Save</button>
+          </div>
+          <select id="edit-lang-${p.name}" style="margin-bottom:0">${langOptions}</select>
+        </div>`;
+      }
+      return `<div class="card">
+        <div class="row">
+          <span style="font-weight:700">${langObj ? flagImg(langObj.code) : ''}${p.name}</span>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
+            <div class="btn-actions">
+              <button class="btn-small btn-edit" onclick="startEditPlayer('${p.name}')">✏️</button>
+              <button class="btn-small btn-delete" onclick="deletePlayer('${p.name}')">🗑️</button>
+            </div>
+          </div>
+        </div>
+        ${editSection}
+      </div>`;
+    }).join('');
+  }
+}
+
+render();
 </script>
 </body>
 </html>
