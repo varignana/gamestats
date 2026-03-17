@@ -98,6 +98,12 @@
   .sync-dot.error { background: #ef4444; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .loading { text-align: center; color: #94a3b8; padding: 60px 20px; font-size: 16px; }
+ .admin-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000; }
+  .admin-modal { background:#1e293b; border-radius:16px; padding:24px; width:90%; max-width:360px; }
+  .admin-modal h3 { color:#38bdf8; font-size:18px; font-weight:800; margin-bottom:16px; text-align:center; }
+  .admin-status { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#0f172a; border-radius:8px; margin-bottom:16px; font-size:13px; color:#4ade80; font-weight:700; }
+  .admin-lock-btn { width:100%; padding:12px; background:#334155; color:#94a3b8; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .admin-lock-btn:hover { background:#475569; }
 </style>
 </head>
 <body>
@@ -140,40 +146,66 @@
     </div>
 
     <div id="tab-players" class="tab">
-      <div class="section-title">Add Player</div>
-      <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
-        <div class="input-row" style="margin-bottom:10px;">
-          <input id="newPlayer" placeholder="Player name..." onkeydown="if(event.key==='Enter') addPlayer()" style="margin-bottom:0">
-          <button class="btn-small btn-add" onclick="addPlayer()">Add</button>
-        </div>
-        <label style="margin-bottom:6px;">Language team</label>
-        <select id="newPlayerLang" style="margin-bottom:0">
-          <option value="">No language</option>
-          <option value="en">English</option>
-          <option value="it">Italian</option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="pt">Portuguese</option>
-        </select>
-      </div>
-      <div class="section-title">Players</div>
-      <div id="player-list"></div>
-      <hr class="divider">
-      <div class="section-title">⚙️ Settings</div>
-      <div class="setting-row">
-        <label>Min matches to appear in leaderboard</label>
-        <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
-      </div>
-      <hr class="divider">
-      <div class="section-title">📤 Export & Import</div>
-      <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
-      <label for="importFile" class="btn-outline">📥 Import Data</label>
-      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
-      <hr class="divider">
-      <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
-    </div>
-  </div>
 
+      <!-- Admin lock -->
+      <div id="admin-locked" style="display:block">
+        <button class="admin-lock-btn" onclick="showAdminLogin()">🔒 Admin Login to manage players</button>
+      </div>
+      <div id="admin-unlocked" style="display:none">
+        <div class="admin-status">🔓 Logged in as admin</div>
+      </div>
+
+      <!-- Admin only content -->
+      <div id="admin-content" style="display:none">
+        <div class="section-title">Add Player</div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="input-row" style="margin-bottom:10px;">
+            <input id="newPlayer" placeholder="Player name..." onkeydown="if(event.key==='Enter') addPlayer()" style="margin-bottom:0">
+            <button class="btn-small btn-add" onclick="addPlayer()">Add</button>
+          </div>
+          <label style="margin-bottom:6px;">Language team</label>
+          <select id="newPlayerLang" style="margin-bottom:0">
+            <option value="">No language</option>
+            <option value="en">English</option>
+            <option value="it">Italian</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="pt">Portuguese</option>
+          </select>
+        </div>
+        <div class="section-title">Players</div>
+        <div id="player-list"></div>
+        <hr class="divider">
+        <div class="section-title">⚙️ Settings</div>
+        <div class="setting-row">
+          <label>Min matches to appear in leaderboard</label>
+          <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
+        </div>
+        <hr class="divider">
+        <div class="section-title">📤 Export & Import</div>
+        <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
+        <label for="importFile" class="btn-outline">📥 Import Data</label>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <hr class="divider">
+        <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
+      </div>
+
+    </div>
+   
+ <!-- Admin login modal -->
+    <div id="admin-overlay" class="admin-overlay" style="display:none">
+      <div class="admin-modal">
+        <h3>🔒 Admin Login</h3>
+        <label>Username</label>
+        <input type="text" id="admin-username" placeholder="Username..." style="margin-bottom:12px">
+        <label>Password</label>
+        <input type="password" id="admin-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptLogin()">
+        <button class="btn" onclick="attemptLogin()">Login</button>
+        <button class="btn-danger" onclick="hideAdminLogin()">Cancel</button>
+      </div>
+    </div>
+
+   
   <div id="h2h-screen" class="screen">
     <button class="btn-back" onclick="closeH2H()">← Back to Leaderboard</button>
     <div id="h2h-content"></div>
@@ -183,7 +215,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ============================================
 // REPLACE THESE WITH YOUR FIREBASE VALUES
@@ -761,6 +793,7 @@ function render() {
       </div>`;
     }).join('');
   }
+ renderAdminState();
 }
 
 window.switchTab = switchTab;
@@ -780,7 +813,51 @@ window.exportData = exportData;
 window.importData = importData;
 window.resetData = resetData;
 window.saveSettings = saveSettings;
- 
+
+window.showAdminLogin = function() {
+  document.getElementById('admin-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('admin-username').focus(), 100);
+}
+
+window.hideAdminLogin = function() {
+  document.getElementById('admin-overlay').style.display = 'none';
+  document.getElementById('admin-username').value = '';
+  document.getElementById('admin-password').value = '';
+}
+
+window.attemptLogin = async function() {
+  const username = document.getElementById('admin-username').value.trim();
+  const password = document.getElementById('admin-password').value;
+  try {
+    const adminRef = doc(db, 'admin', 'credentials');
+    const snap = await getDoc(adminRef);
+    if (snap.exists()) {
+      const creds = snap.data();
+      if (username === creds.username && password === creds.password) {
+        sessionStorage.setItem('isAdmin', 'true');
+        hideAdminLogin();
+        showMessage('Welcome admin! 👋', 'success');
+        renderAdminState();
+      } else {
+        showMessage('Wrong username or password!', 'error');
+      }
+    }
+  } catch(e) {
+    showMessage('Login error!', 'error');
+  }
+}
+
+function renderAdminState() {
+  const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+  const locked = document.getElementById('admin-locked');
+  const unlocked = document.getElementById('admin-unlocked');
+  const content = document.getElementById('admin-content');
+  if (locked) locked.style.display = isAdmin ? 'none' : 'block';
+  if (unlocked) unlocked.style.display = isAdmin ? 'block' : 'none';
+  if (content) content.style.display = isAdmin ? 'block' : 'none';
+
+}
+
 render();
 </script>
 </body>
