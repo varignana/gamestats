@@ -835,9 +835,9 @@ window.attemptLogin = async function() {
       const creds = snap.data();
       if (username === creds.username && password === creds.password) {
         sessionStorage.setItem('isAdmin', 'true');
-        hideAdminLogin();
+        window.hideAdminLogin();
         showMessage('Welcome admin! 👋', 'success');
-        renderAdminState();
+        window.renderAdminState();
       } else {
         showMessage('Wrong username or password!', 'error');
       }
@@ -857,7 +857,7 @@ function renderAdminState() {
   if (content) content.style.display = isAdmin ? 'block' : 'none';
 
 }
-
+window.renderAdminState = renderAdminState;
 render();
 </script>
 </body>
