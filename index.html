@@ -111,6 +111,11 @@
   .pending-badge { background:#f59e0b; color:#0f172a; border-radius:20px; padding:2px 8px; font-size:12px; font-weight:800; cursor:pointer; }
   .pending-section { background:#1e293b; border-radius:10px; padding:14px; margin-bottom:16px; border: 1px solid #f59e0b; }
   .pending-title { color:#f59e0b; font-size:14px; font-weight:700; margin-bottom:10px; }
+  .result-btns { display:flex; gap:8px; margin-bottom:16px; }
+  .result-btn { flex:1; padding:12px; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; }
+  .result-btn.active-won { background:#38bdf8; color:#0f172a; }
+  .result-btn.active-lost { background:#ef4444; color:white; }
+  .result-btn.inactive { background:#1e293b; color:#94a3b8; }
 </style>
 </head>
 <body>
@@ -123,7 +128,6 @@
       <span id="sync-text">Connecting...</span>
     </div>
 
-    <!-- Top bar -->
     <div class="topbar">
       <div class="topbar-user" id="topbar-user">👤 Not logged in</div>
       <div class="topbar-actions">
@@ -156,27 +160,28 @@
         <button class="btn" onclick="showPlayerLogin()">Login</button>
       </div>
       <div id="log-form" style="display:none">
-  <div class="section-title">Log a Match</div>
-  <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
-    Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
-  </div>
-  <div id="log-player-form">
-    <label>Result</label>
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button id="result-won-btn" class="btn" style="margin-bottom:0;opacity:1" onclick="setResult('won')">🏆 I Won</button>
-      <button id="result-lost-btn" class="btn" style="margin-bottom:0;background:#1e293b;color:#94a3b8;" onclick="setResult('lost')">💀 I Lost</button>
+        <div class="section-title">Log a Match</div>
+        <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
+          Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
+        </div>
+        <div id="log-player-form">
+          <label>Result</label>
+          <div class="result-btns">
+            <button id="result-won-btn" class="result-btn active-won" onclick="setResult('won')">🏆 I Won</button>
+            <button id="result-lost-btn" class="result-btn inactive" onclick="setResult('lost')">💀 I Lost</button>
+          </div>
+          <label>Opponent</label>
+          <select id="opponent"><option value="">Select opponent...</option></select>
+        </div>
+        <div id="log-admin-form" style="display:none">
+          <label>🏆 Winner</label>
+          <select id="winner"><option value="">Select winner...</option></select>
+          <label>💀 Loser</label>
+          <select id="loser"><option value="">Select loser...</option></select>
+        </div>
+        <button class="btn" style="margin-top:8px" onclick="logMatch()">Log Match</button>
+      </div>
     </div>
-    <label>Opponent</label>
-    <select id="opponent"><option value="">Select opponent...</option></select>
-  </div>
-  <div id="log-admin-form" style="display:none">
-    <label>🏆 Winner</label>
-    <select id="winner"><option value="">Select winner...</option></select>
-    <label>💀 Loser</label>
-    <select id="loser"><option value="">Select loser...</option></select>
-  </div>
-  <button class="btn" style="margin-top:8px" onclick="logMatch()">Log Match</button>
-</div>
 
     <!-- HISTORY TAB -->
     <div id="tab-history" class="tab">
@@ -214,7 +219,7 @@
             <option value="pt">Portuguese</option>
           </select>
           <label>Initial password</label>
-          <input type="password" id="newPlayerPassword" placeholder="Set initial password...">
+          <input type="password" id="newPlayerPassword" placeholder="Set initial password..." style="margin-bottom:10px">
           <button class="btn" onclick="addPlayer()">Add Player</button>
         </div>
         <div class="section-title">Players</div>
@@ -233,15 +238,13 @@
         <hr class="divider">
         <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
       </div>
-
-      <!-- My Account section for logged in players -->
       <div id="my-account" style="display:none">
         <div class="section-title">👤 My Account</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
           <label>New password</label>
-          <input type="password" id="new-password" placeholder="Enter new password...">
+          <input type="password" id="new-password" placeholder="Enter new password..." style="margin-bottom:10px">
           <label>Confirm new password</label>
-          <input type="password" id="confirm-password" placeholder="Confirm new password...">
+          <input type="password" id="confirm-password" placeholder="Confirm new password..." style="margin-bottom:10px">
           <button class="btn" onclick="changePassword()">Change Password</button>
         </div>
       </div>
@@ -252,9 +255,9 @@
       <div class="modal">
         <h3>🔒 Admin Login</h3>
         <label>Username</label>
-        <input type="text" id="admin-username" placeholder="Username...">
+        <input type="text" id="admin-username" placeholder="Username..." style="margin-bottom:12px">
         <label>Password</label>
-        <input type="password" id="admin-password" placeholder="Password..." onkeydown="if(event.key==='Enter') attemptAdminLogin()">
+        <input type="password" id="admin-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptAdminLogin()">
         <button class="btn" onclick="attemptAdminLogin()">Login</button>
         <button class="btn-danger" onclick="hideAdminLogin()">Cancel</button>
       </div>
@@ -267,7 +270,7 @@
         <label>Select your name</label>
         <select id="player-login-select" style="margin-bottom:12px"><option value="">Select player...</option></select>
         <label>Password</label>
-        <input type="password" id="player-login-password" placeholder="Password..." onkeydown="if(event.key==='Enter') attemptPlayerLogin()">
+        <input type="password" id="player-login-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptPlayerLogin()">
         <button class="btn" onclick="attemptPlayerLogin()">Login</button>
         <button class="btn-danger" onclick="hidePlayerLogin()">Cancel</button>
       </div>
@@ -283,7 +286,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, onSnapshot, setDoc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ============================================
 // REPLACE THESE WITH YOUR FIREBASE VALUES
@@ -320,7 +323,7 @@ let editingMatch = null;
 let editingPlayer = null;
 let selectedPlayer = null;
 let activeLang = 'all';
-let currentPlayer = null; // logged in player name
+let currentPlayer = null;
 let isAdmin = false;
 let matchResult = 'won';
 
@@ -413,8 +416,12 @@ function getFlag(name) {
   return flagImg(p.lang);
 }
 
+function getConfirmed() {
+  return data.matches.filter(m => m.status === 'confirmed' || !m.status);
+}
+
 function getStats(name) {
-  const confirmed = data.matches.filter(m => m.status === 'confirmed' || !m.status);
+  const confirmed = getConfirmed();
   const wins = confirmed.filter(m => m.winner === name).length;
   const losses = confirmed.filter(m => m.loser === name).length;
   const total = wins + losses;
@@ -423,7 +430,7 @@ function getStats(name) {
 }
 
 function getH2H(p1, p2) {
-  const confirmed = data.matches.filter(m => m.status === 'confirmed' || !m.status);
+  const confirmed = getConfirmed();
   const p1wins = confirmed.filter(m => m.winner === p1 && m.loser === p2).length;
   const p2wins = confirmed.filter(m => m.winner === p2 && m.loser === p1).length;
   const total = p1wins + p2wins;
@@ -432,7 +439,7 @@ function getH2H(p1, p2) {
 }
 
 function getLongestWinStreak(name) {
-  const confirmed = data.matches.filter(m => m.status === 'confirmed' || !m.status);
+  const confirmed = getConfirmed();
   let best = 0, current = 0;
   confirmed.forEach(m => {
     if (m.winner === name) { current++; best = Math.max(best, current); }
@@ -442,7 +449,18 @@ function getLongestWinStreak(name) {
 }
 
 function getPendingForPlayer(name) {
-  return data.matches.filter(m => m.status === 'pending' && m.loser === name && m.winner !== name);
+  return data.matches.map((m, i) => ({ ...m, idx: i }))
+    .filter(m => m.status === 'pending' && m.loser === name);
+}
+
+function setResult(result) {
+  matchResult = result;
+  const wonBtn = document.getElementById('result-won-btn');
+  const lostBtn = document.getElementById('result-lost-btn');
+  if (wonBtn) {
+    wonBtn.className = result === 'won' ? 'result-btn active-won' : 'result-btn inactive';
+    lostBtn.className = result === 'lost' ? 'result-btn active-lost' : 'result-btn inactive';
+  }
 }
 
 // ---- ADMIN AUTH ----
@@ -489,6 +507,7 @@ function showPlayerLogin() {
   select.innerHTML = '<option value="">Select player...</option>' +
     data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
   document.getElementById('player-overlay').style.display = 'flex';
+  setTimeout(() => select.focus(), 100);
 }
 function hidePlayerLogin() {
   document.getElementById('player-overlay').style.display = 'none';
@@ -499,7 +518,7 @@ async function attemptPlayerLogin() {
   const password = document.getElementById('player-login-password').value;
   if (!name) { showMessage('Please select your name!', 'error'); return; }
   const storedPassword = playerPasswords[name];
-  if (!storedPassword) { showMessage('No password set for this player. Ask admin!', 'error'); return; }
+  if (!storedPassword) { showMessage('No password set. Ask admin!', 'error'); return; }
   if (password === storedPassword) {
     currentPlayer = name;
     sessionStorage.setItem('currentPlayer', name);
@@ -518,11 +537,12 @@ function playerLogout() {
 }
 
 function scrollToPending() {
-  switchTab('history', document.querySelectorAll('.nav button')[2]);
+  const historyBtn = document.querySelectorAll('.nav button')[2];
+  switchTab('history', historyBtn);
   setTimeout(() => {
     const el = document.getElementById('pending-section');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
-  }, 100);
+  }, 200);
 }
 
 // ---- PLAYER MANAGEMENT ----
@@ -585,7 +605,7 @@ async function saveEditPlayer(oldName) {
     playerPasswords[newName] = playerPasswords[oldName];
     delete playerPasswords[oldName];
   }
-  if (newPass) { playerPasswords[newName] = newPass; }
+  if (newPass) { playerPasswords[newName || oldName] = newPass; }
   await save();
   await setDoc(playersAuthRef, playerPasswords);
   editingPlayer = null;
@@ -607,7 +627,6 @@ async function changePassword() {
 // ---- MATCH MANAGEMENT ----
 async function logMatch() {
   let winner, loser;
-
   if (isAdmin) {
     winner = document.getElementById('winner').value;
     loser = document.getElementById('loser').value;
@@ -621,7 +640,6 @@ async function logMatch() {
     loser = matchResult === 'won' ? opponent : currentPlayer;
   }
 
-  // Duplicate check — same two players, same date, already pending
   const today = new Date().toLocaleDateString();
   const duplicate = data.matches.find(m =>
     m.status === 'pending' &&
@@ -635,12 +653,16 @@ async function logMatch() {
   const status = isAdmin ? 'confirmed' : 'pending';
   data.matches.push({ winner, loser, date: today, loggedBy: currentPlayer || 'admin', status });
   await save();
-  document.getElementById('opponent') && (document.getElementById('opponent').value = '');
-  if (document.getElementById('winner')) document.getElementById('winner').value = '';
-  if (document.getElementById('loser')) document.getElementById('loser').value = '';
+
+  const opponentEl = document.getElementById('opponent');
+  if (opponentEl) opponentEl.value = '';
+  const winnerEl = document.getElementById('winner');
+  if (winnerEl) winnerEl.value = '';
+  const loserEl = document.getElementById('loser');
+  if (loserEl) loserEl.value = '';
 
   if (status === 'pending') {
-    showMessage('Match logged! Waiting for ' + loser + ' to confirm ⏳', 'success');
+    showMessage('Match logged! Waiting for ' + (matchResult === 'won' ? loser : winner) + ' to confirm ⏳', 'success');
   } else {
     showMessage('Match logged! ✅', 'success');
   }
@@ -687,9 +709,8 @@ async function saveEditMatch(index) {
 function openH2H(p1, p2) {
   selectedPlayer = null;
   const h = getH2H(p1, p2);
-  const matches = data.matches.filter(m =>
-    (m.status === 'confirmed' || !m.status) &&
-    ((m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1))
+  const matches = getConfirmed().filter(m =>
+    (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
   ).reverse();
   const historyHTML = matches.length === 0
     ? '<div class="empty">No matches between these players yet.</div>'
@@ -782,19 +803,8 @@ async function resetData() {
   showMessage('All data reset.', 'info');
 }
 
- function setResult(result) {
-  matchResult = result;
-  document.getElementById('result-won-btn').style.background = result === 'won' ? '#38bdf8' : '#1e293b';
-  document.getElementById('result-won-btn').style.color = result === 'won' ? '#0f172a' : '#94a3b8';
-  document.getElementById('result-lost-btn').style.background = result === 'lost' ? '#ef4444' : '#1e293b';
-  document.getElementById('result-lost-btn').style.color = result === 'lost' ? 'white' : '#94a3b8';
-}
-window.setResult = setResult;
-
- 
 // ---- RENDER ----
 function render() {
-  // restore session
   if (sessionStorage.getItem('isAdmin') === 'true') isAdmin = true;
   if (sessionStorage.getItem('currentPlayer')) currentPlayer = sessionStorage.getItem('currentPlayer');
 
@@ -810,11 +820,15 @@ function render() {
     logoutBtn.style.display = 'block';
     const pending = getPendingForPlayer(currentPlayer);
     if (pending.length > 0) {
-      pendingBadge.style.display = 'block';
+      pendingBadge.style.display = 'inline-block';
       pendingBadge.textContent = `⏳ ${pending.length} pending`;
     } else {
       pendingBadge.style.display = 'none';
     }
+  } else if (isAdmin) {
+    topbarUser.innerHTML = '🔒 Admin';
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'none';
   } else {
     topbarUser.innerHTML = '👤 Not logged in';
     loginBtn.style.display = 'block';
@@ -823,14 +837,10 @@ function render() {
   }
 
   // admin state
-  const adminLocked = document.getElementById('admin-locked');
-  const adminUnlocked = document.getElementById('admin-unlocked');
-  const adminContent = document.getElementById('admin-content');
-  const myAccount = document.getElementById('my-account');
-  adminLocked.style.display = isAdmin ? 'none' : 'block';
-  adminUnlocked.style.display = isAdmin ? 'block' : 'none';
-  adminContent.style.display = isAdmin ? 'block' : 'none';
-  myAccount.style.display = (currentPlayer && !isAdmin) ? 'block' : 'none';
+  document.getElementById('admin-locked').style.display = isAdmin ? 'none' : (currentPlayer ? 'none' : 'block');
+  document.getElementById('admin-unlocked').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('admin-content').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('my-account').style.display = (currentPlayer && !isAdmin) ? 'block' : 'none';
 
   // log tab
   const logNotLogged = document.getElementById('log-not-logged');
@@ -845,7 +855,6 @@ function render() {
     logNotLogged.style.display = 'none';
     logForm.style.display = 'block';
     document.getElementById('log-as-name').textContent = isAdmin ? 'Admin (can log any match)' : currentPlayer;
-
     if (isAdmin) {
       logPlayerForm.style.display = 'none';
       logAdminForm.style.display = 'block';
@@ -855,13 +864,11 @@ function render() {
     } else {
       logPlayerForm.style.display = 'block';
       logAdminForm.style.display = 'none';
-      const opponentOptions = data.players
-        .filter(p => p.name !== currentPlayer)
+      const opponentOptions = data.players.filter(p => p.name !== currentPlayer)
         .map(p => `<option value="${p.name}">${p.name}</option>`).join('');
       document.getElementById('opponent').innerHTML = '<option value="">Select opponent...</option>' + opponentOptions;
     }
   }
-
 
   // language filter
   const lf = document.getElementById('lang-filter');
@@ -898,9 +905,9 @@ function render() {
           <div><span class="loss">${s.losses}</span><span>Losses</span></div>
           <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
         </div>`;
-        const opponents = playerNames
-          .filter(op => op !== p.name)
-          .map(op => ({ name: op, ...getH2H(p.name, op) }))
+        const opponents = data.players
+          .filter(op => op.name !== p.name)
+          .map(op => ({ name: op.name, ...getH2H(p.name, op.name) }))
           .filter(op => op.total > 0)
           .sort((a, b) => b.total - a.total);
         const opponentsHTML = opponents.length === 0
@@ -959,7 +966,7 @@ function render() {
 
   // general stats
   const gs = document.getElementById('general-stats');
-  const confirmedMatches = data.matches.filter(m => m.status === 'confirmed' || !m.status);
+  const confirmedMatches = getConfirmed();
   if (confirmedMatches.length === 0) {
     gs.innerHTML = '';
   } else {
@@ -1001,23 +1008,21 @@ function render() {
       ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div><div class="gen-stat-card">${langStatsHTML}</div>` : ''}`;
   }
 
-  // pending matches section
+  // pending matches
   const pendingSection = document.getElementById('pending-section');
   const pendingList = document.getElementById('pending-list');
   if (currentPlayer) {
     const pending = getPendingForPlayer(currentPlayer);
     if (pending.length > 0) {
       pendingSection.style.display = 'block';
-      pendingList.innerHTML = pending.map((m) => {
-        const idx = data.matches.indexOf(m);
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
+      pendingList.innerHTML = pending.map(m => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
           <span><span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span> <span style="color:#475569;font-size:12px">${m.date}</span></span>
           <div style="display:flex;gap:6px;">
-            <button class="btn-confirm" onclick="confirmMatch(${idx})">✅ Confirm</button>
-            <button class="btn-reject" onclick="rejectMatch(${idx})">❌ Reject</button>
+            <button class="btn-confirm" onclick="confirmMatch(${m.idx})">✅</button>
+            <button class="btn-reject" onclick="rejectMatch(${m.idx})">❌</button>
           </div>
-        </div>`;
-      }).join('');
+        </div>`).join('');
     } else {
       pendingSection.style.display = 'none';
     }
@@ -1046,7 +1051,7 @@ function render() {
       return `<div class="card ${isPending ? 'pending' : ''}">
         <div class="row">
           <span style="font-size:14px">
-            ${isPending ? '<span style="color:#f59e0b;font-size:11px;margin-right:4px;">⏳ PENDING</span>' : ''}
+            ${isPending ? '<span style="color:#f59e0b;font-size:11px;margin-right:4px;">⏳</span>' : ''}
             <span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span>
           </span>
           <div style="display:flex;gap:6px;align-items:center">
@@ -1064,6 +1069,7 @@ function render() {
 
   // player list
   const pl = document.getElementById('player-list');
+  if (!pl) return;
   if (data.players.length === 0) {
     pl.innerHTML = '<div class="empty">No players yet!</div>';
   } else {
@@ -1130,6 +1136,7 @@ window.attemptPlayerLogin = attemptPlayerLogin;
 window.playerLogout = playerLogout;
 window.scrollToPending = scrollToPending;
 window.changePassword = changePassword;
+window.setResult = setResult;
 
 render();
 </script>
