@@ -156,17 +156,27 @@
         <button class="btn" onclick="showPlayerLogin()">Login</button>
       </div>
       <div id="log-form" style="display:none">
-        <div class="section-title">Log a Match</div>
-        <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
-          Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
-        </div>
-        <label>🏆 Winner</label>
-        <select id="winner"><option value="">Select winner...</option></select>
-        <label>💀 Loser</label>
-        <select id="loser"><option value="">Select loser...</option></select>
-        <button class="btn" onclick="logMatch()">Log Match</button>
-      </div>
+  <div class="section-title">Log a Match</div>
+  <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
+    Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
+  </div>
+  <div id="log-player-form">
+    <label>Result</label>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="result-won-btn" class="btn" style="margin-bottom:0;opacity:1" onclick="setResult('won')">🏆 I Won</button>
+      <button id="result-lost-btn" class="btn" style="margin-bottom:0;background:#1e293b;color:#94a3b8;" onclick="setResult('lost')">💀 I Lost</button>
     </div>
+    <label>Opponent</label>
+    <select id="opponent"><option value="">Select opponent...</option></select>
+  </div>
+  <div id="log-admin-form" style="display:none">
+    <label>🏆 Winner</label>
+    <select id="winner"><option value="">Select winner...</option></select>
+    <label>💀 Loser</label>
+    <select id="loser"><option value="">Select loser...</option></select>
+  </div>
+  <button class="btn" style="margin-top:8px" onclick="logMatch()">Log Match</button>
+</div>
 
     <!-- HISTORY TAB -->
     <div id="tab-history" class="tab">
@@ -312,6 +322,7 @@ let selectedPlayer = null;
 let activeLang = 'all';
 let currentPlayer = null; // logged in player name
 let isAdmin = false;
+let matchResult = 'won';
 
 function setSyncStatus(state) {
   const dot = document.getElementById('sync-dot');
@@ -595,21 +606,39 @@ async function changePassword() {
 
 // ---- MATCH MANAGEMENT ----
 async function logMatch() {
-  const winner = document.getElementById('winner').value;
-  const loser = document.getElementById('loser').value;
-  if (!winner || !loser || winner === loser) {
-    showMessage('Pick two different players!', 'error'); return;
+  let winner, loser;
+
+  if (isAdmin) {
+    winner = document.getElementById('winner').value;
+    loser = document.getElementById('loser').value;
+    if (!winner || !loser || winner === loser) {
+      showMessage('Pick two different players!', 'error'); return;
+    }
+  } else {
+    const opponent = document.getElementById('opponent').value;
+    if (!opponent) { showMessage('Pick an opponent!', 'error'); return; }
+    winner = matchResult === 'won' ? currentPlayer : opponent;
+    loser = matchResult === 'won' ? opponent : currentPlayer;
   }
+
+  // Duplicate check — same two players, same date, already pending
+  const today = new Date().toLocaleDateString();
+  const duplicate = data.matches.find(m =>
+    m.status === 'pending' &&
+    ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
+    m.date === today
+  );
+  if (duplicate) {
+    showMessage('A pending match between these players already exists today!', 'error'); return;
+  }
+
   const status = isAdmin ? 'confirmed' : 'pending';
-  data.matches.push({
-    winner, loser,
-    date: new Date().toLocaleDateString(),
-    loggedBy: currentPlayer || 'admin',
-    status
-  });
+  data.matches.push({ winner, loser, date: today, loggedBy: currentPlayer || 'admin', status });
   await save();
-  document.getElementById('winner').value = '';
-  document.getElementById('loser').value = '';
+  document.getElementById('opponent') && (document.getElementById('opponent').value = '');
+  if (document.getElementById('winner')) document.getElementById('winner').value = '';
+  if (document.getElementById('loser')) document.getElementById('loser').value = '';
+
   if (status === 'pending') {
     showMessage('Match logged! Waiting for ' + loser + ' to confirm ⏳', 'success');
   } else {
@@ -753,6 +782,16 @@ async function resetData() {
   showMessage('All data reset.', 'info');
 }
 
+ function setResult(result) {
+  matchResult = result;
+  document.getElementById('result-won-btn').style.background = result === 'won' ? '#38bdf8' : '#1e293b';
+  document.getElementById('result-won-btn').style.color = result === 'won' ? '#0f172a' : '#94a3b8';
+  document.getElementById('result-lost-btn').style.background = result === 'lost' ? '#ef4444' : '#1e293b';
+  document.getElementById('result-lost-btn').style.color = result === 'lost' ? 'white' : '#94a3b8';
+}
+window.setResult = setResult;
+
+ 
 // ---- RENDER ----
 function render() {
   // restore session
@@ -796,6 +835,9 @@ function render() {
   // log tab
   const logNotLogged = document.getElementById('log-not-logged');
   const logForm = document.getElementById('log-form');
+  const logPlayerForm = document.getElementById('log-player-form');
+  const logAdminForm = document.getElementById('log-admin-form');
+
   if (!currentPlayer && !isAdmin) {
     logNotLogged.style.display = 'block';
     logForm.style.display = 'none';
@@ -803,25 +845,23 @@ function render() {
     logNotLogged.style.display = 'none';
     logForm.style.display = 'block';
     document.getElementById('log-as-name').textContent = isAdmin ? 'Admin (can log any match)' : currentPlayer;
-  }
 
-  // player selects
-  const playerNames = data.players.map(p => p.name);
-  let winnerOptions, loserOptions;
-  if (isAdmin) {
-    winnerOptions = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-    loserOptions = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-  } else if (currentPlayer) {
-    winnerOptions = `<option value="${currentPlayer}" selected>${currentPlayer}</option>`;
-    loserOptions = data.players.filter(p => p.name !== currentPlayer).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-  }
-  if (document.getElementById('winner')) {
-    document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + (winnerOptions || '');
-    document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + (loserOptions || '');
-    if (currentPlayer && !isAdmin) {
-      document.getElementById('winner').value = currentPlayer;
+    if (isAdmin) {
+      logPlayerForm.style.display = 'none';
+      logAdminForm.style.display = 'block';
+      const playerOptions = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+      document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
+      document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
+    } else {
+      logPlayerForm.style.display = 'block';
+      logAdminForm.style.display = 'none';
+      const opponentOptions = data.players
+        .filter(p => p.name !== currentPlayer)
+        .map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+      document.getElementById('opponent').innerHTML = '<option value="">Select opponent...</option>' + opponentOptions;
     }
   }
+
 
   // language filter
   const lf = document.getElementById('lang-filter');
