@@ -98,12 +98,11 @@
   .sync-dot.error { background: #ef4444; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .loading { text-align: center; color: #94a3b8; padding: 60px 20px; font-size: 16px; }
- .admin-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000; }
+  .admin-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000; }
   .admin-modal { background:#1e293b; border-radius:16px; padding:24px; width:90%; max-width:360px; }
   .admin-modal h3 { color:#38bdf8; font-size:18px; font-weight:800; margin-bottom:16px; text-align:center; }
   .admin-status { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#0f172a; border-radius:8px; margin-bottom:16px; font-size:13px; color:#4ade80; font-weight:700; }
   .admin-lock-btn { width:100%; padding:12px; background:#334155; color:#94a3b8; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px; }
-  .admin-lock-btn:hover { background:#475569; }
 </style>
 </head>
 <body>
@@ -146,16 +145,12 @@
     </div>
 
     <div id="tab-players" class="tab">
-
-      <!-- Admin lock -->
-      <div id="admin-locked" style="display:block">
+      <div id="admin-locked">
         <button class="admin-lock-btn" onclick="showAdminLogin()">🔒 Admin Login to manage players</button>
       </div>
       <div id="admin-unlocked" style="display:none">
         <div class="admin-status">🔓 Logged in as admin</div>
       </div>
-
-      <!-- Admin only content -->
       <div id="admin-content" style="display:none">
         <div class="section-title">Add Player</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -189,10 +184,8 @@
         <hr class="divider">
         <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
       </div>
-
     </div>
-   
- <!-- Admin login modal -->
+
     <div id="admin-overlay" class="admin-overlay" style="display:none">
       <div class="admin-modal">
         <h3>🔒 Admin Login</h3>
@@ -205,7 +198,8 @@
       </div>
     </div>
 
-   
+  </div>
+
   <div id="h2h-screen" class="screen">
     <button class="btn-back" onclick="closeH2H()">← Back to Leaderboard</button>
     <div id="h2h-content"></div>
@@ -215,7 +209,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, onSnapshot, setDoc, collection, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ============================================
 // REPLACE THESE WITH YOUR FIREBASE VALUES
@@ -226,7 +220,7 @@ const firebaseConfig = {
   projectId: "gamestats-firebase",
   storageBucket: "gamestats-firebase.firebasestorage.app",
   messagingSenderId: "767922445574",
-  appId: "G-0J4XXBKZ4B"
+  appId: "1:767922445574:web:dbd33d8f25da0d00d4d287"
 };
 // ============================================
 
@@ -234,6 +228,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const dataRef = doc(db, 'gamestats', 'data');
 const settingsRef = doc(db, 'gamestats', 'settings');
+const adminRef = doc(db, 'admin', 'credentials');
 
 const LANGUAGES = [
   { code: 'en', label: 'English', country: 'gb' },
@@ -249,7 +244,6 @@ let editingMatch = null;
 let editingPlayer = null;
 let selectedPlayer = null;
 let activeLang = 'all';
-let isSaving = false;
 
 function setSyncStatus(state) {
   const dot = document.getElementById('sync-dot');
@@ -257,11 +251,10 @@ function setSyncStatus(state) {
   if (state === 'live') { dot.className = 'sync-dot'; text.textContent = 'Live — data shared with everyone'; }
   else if (state === 'syncing') { dot.className = 'sync-dot syncing'; text.textContent = 'Saving...'; }
   else if (state === 'error') { dot.className = 'sync-dot error'; text.textContent = 'Connection error'; }
-  else if (state === 'connecting') { dot.className = 'sync-dot syncing'; text.textContent = 'Connecting...'; }
+  else { dot.className = 'sync-dot syncing'; text.textContent = 'Connecting...'; }
 }
 
 async function save() {
-  isSaving = true;
   setSyncStatus('syncing');
   try {
     await setDoc(dataRef, { players: data.players, matches: data.matches });
@@ -270,7 +263,6 @@ async function save() {
     setSyncStatus('error');
     showMessage('Error saving data!', 'error');
   }
-  isSaving = false;
 }
 
 async function saveSettings() {
@@ -279,7 +271,6 @@ async function saveSettings() {
   render();
 }
 
-// Listen for real-time updates from Firebase
 onSnapshot(dataRef, (snap) => {
   if (snap.exists()) {
     const d = snap.data();
@@ -290,9 +281,7 @@ onSnapshot(dataRef, (snap) => {
   }
   setSyncStatus('live');
   render();
-}, (error) => {
-  setSyncStatus('error');
-});
+}, () => setSyncStatus('error'));
 
 onSnapshot(settingsRef, (snap) => {
   if (snap.exists()) {
@@ -355,7 +344,60 @@ function getH2H(p1, p2) {
   return { p1wins, p2wins, total, pct };
 }
 
-window.addPlayer = async function() {
+function getLongestWinStreak(name) {
+  let best = 0, current = 0;
+  data.matches.forEach(m => {
+    if (m.winner === name) { current++; best = Math.max(best, current); }
+    else if (m.loser === name) { current = 0; }
+  });
+  return best;
+}
+
+function renderAdminState() {
+  const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+  const locked = document.getElementById('admin-locked');
+  const unlocked = document.getElementById('admin-unlocked');
+  const content = document.getElementById('admin-content');
+  if (locked) locked.style.display = isAdmin ? 'none' : 'block';
+  if (unlocked) unlocked.style.display = isAdmin ? 'block' : 'none';
+  if (content) content.style.display = isAdmin ? 'block' : 'none';
+}
+
+function showAdminLogin() {
+  document.getElementById('admin-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('admin-username').focus(), 100);
+}
+
+function hideAdminLogin() {
+  document.getElementById('admin-overlay').style.display = 'none';
+  document.getElementById('admin-username').value = '';
+  document.getElementById('admin-password').value = '';
+}
+
+async function attemptLogin() {
+  const username = document.getElementById('admin-username').value.trim();
+  const password = document.getElementById('admin-password').value;
+  try {
+    const snap = await getDoc(adminRef);
+    if (snap.exists()) {
+      const creds = snap.data();
+      if (username === creds.username && password === creds.password) {
+        sessionStorage.setItem('isAdmin', 'true');
+        hideAdminLogin();
+        showMessage('Welcome admin! 👋', 'success');
+        renderAdminState();
+      } else {
+        showMessage('Wrong username or password!', 'error');
+      }
+    } else {
+      showMessage('Admin not configured!', 'error');
+    }
+  } catch(e) {
+    showMessage('Login error: ' + e.message, 'error');
+  }
+}
+
+async function addPlayer() {
   const name = document.getElementById('newPlayer').value.trim();
   const lang = document.getElementById('newPlayerLang').value;
   if (!name) return;
@@ -369,13 +411,13 @@ window.addPlayer = async function() {
   showMessage(name + ' added!', 'success');
 }
 
-window.deletePlayer = async function(name) {
+async function deletePlayer(name) {
   if (!confirm('Delete ' + name + '?')) return;
   data.players = data.players.filter(p => p.name !== name);
   await save();
 }
 
-window.startEditPlayer = function(name) {
+function startEditPlayer(name) {
   editingPlayer = editingPlayer === name ? null : name;
   render();
   if (editingPlayer) {
@@ -386,7 +428,7 @@ window.startEditPlayer = function(name) {
   }
 }
 
-window.saveEditPlayer = async function(oldName) {
+async function saveEditPlayer(oldName) {
   const input = document.getElementById('edit-player-' + oldName);
   const langSelect = document.getElementById('edit-lang-' + oldName);
   const newName = input.value.trim();
@@ -406,7 +448,7 @@ window.saveEditPlayer = async function(oldName) {
   showMessage('Player updated!', 'success');
 }
 
-window.logMatch = async function() {
+async function logMatch() {
   const winner = document.getElementById('winner').value;
   const loser = document.getElementById('loser').value;
   if (!winner || !loser || winner === loser) {
@@ -419,19 +461,19 @@ window.logMatch = async function() {
   showMessage('Match logged! ✅', 'success');
 }
 
-window.deleteMatch = async function(index) {
+async function deleteMatch(index) {
   if (!confirm('Delete this match?')) return;
   data.matches.splice(index, 1);
   await save();
   editingMatch = null;
 }
 
-window.startEditMatch = function(index) {
+function startEditMatch(index) {
   editingMatch = editingMatch === index ? null : index;
   render();
 }
 
-window.saveEditMatch = async function(index) {
+async function saveEditMatch(index) {
   const newWinner = document.getElementById('edit-winner-' + index).value;
   const newLoser = document.getElementById('edit-loser-' + index).value;
   if (!newWinner || !newLoser || newWinner === newLoser) {
@@ -444,13 +486,12 @@ window.saveEditMatch = async function(index) {
   showMessage('Match updated!', 'success');
 }
 
-window.openH2H = function(p1, p2) {
+function openH2H(p1, p2) {
   selectedPlayer = null;
   const h = getH2H(p1, p2);
   const matches = data.matches.filter(m =>
     (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
   ).reverse();
-
   const historyHTML = matches.length === 0
     ? '<div class="empty">No matches between these players yet.</div>'
     : matches.map(m => {
@@ -461,7 +502,6 @@ window.openH2H = function(p1, p2) {
           <span class="result-badge ${isP1Win ? 'result-win' : 'result-loss'}">${isP1Win ? 'W' : 'L'}</span>
         </div>`;
       }).join('');
-
   document.getElementById('h2h-content').innerHTML = `
     <div class="h2h-header">
       <div class="h2h-header-names">
@@ -483,29 +523,28 @@ window.openH2H = function(p1, p2) {
     </div>
     <div class="section-title">Match History</div>
     <div class="card">${historyHTML}</div>`;
-
   document.getElementById('main-app').style.display = 'none';
   document.getElementById('h2h-screen').classList.add('active');
 }
 
-window.closeH2H = function() {
+function closeH2H() {
   document.getElementById('h2h-screen').classList.remove('active');
   document.getElementById('main-app').style.display = 'block';
   render();
 }
 
-window.togglePlayer = function(name) {
+function togglePlayer(name) {
   selectedPlayer = selectedPlayer === name ? null : name;
   render();
 }
 
-window.setLangFilter = function(lang) {
+function setLangFilter(lang) {
   activeLang = lang;
   selectedPlayer = null;
   render();
 }
 
-window.exportData = function() {
+function exportData() {
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -517,7 +556,7 @@ window.exportData = function() {
   showMessage('Data exported!', 'success');
 }
 
-window.importData = async function(event) {
+async function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -536,23 +575,12 @@ window.importData = async function(event) {
   event.target.value = '';
 }
 
-window.resetData = async function() {
+async function resetData() {
   if (!confirm('Reset ALL data? This cannot be undone!')) return;
   if (!confirm('Are you absolutely sure?')) return;
   data = { players: [], matches: [] };
   await save();
   showMessage('All data reset.', 'info');
-}
-
-window.saveSettings = saveSettings;
-
-function getLongestWinStreak(name) {
-  let best = 0, current = 0;
-  data.matches.forEach(m => {
-    if (m.winner === name) { current++; best = Math.max(best, current); }
-    else if (m.loser === name) { current = 0; }
-  });
-  return best;
 }
 
 function render() {
@@ -565,14 +593,10 @@ function render() {
   ).join('');
   lf.innerHTML = allBtn + langBtns;
 
-  const filteredPlayers = activeLang === 'all'
-    ? data.players
-    : data.players.filter(p => p.lang === activeLang);
-
+  const filteredPlayers = activeLang === 'all' ? data.players : data.players.filter(p => p.lang === activeLang);
   const minM = settings.minMatches || 0;
   const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
   const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
-
   ranked.sort((a, b) => {
     const sa = getStats(a.name), sb = getStats(b.name);
     return sb.pct - sa.pct || sb.wins - sa.wins || sb.total - sa.total;
@@ -602,16 +626,14 @@ function render() {
           .sort((a, b) => b.total - a.total);
         const opponentsHTML = opponents.length === 0
           ? '<div style="color:#475569;font-size:13px;text-align:center;padding:8px">No matches yet</div>'
-          : opponents.map(op => {
-              return `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
-                <div class="h2h-opponent-name">${getFlag(op.name)}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
-                <div class="h2h-opponent-stats">
-                  <span class="win">${op.p1wins}W</span>
-                  <span class="loss">${op.p2wins}L</span>
-                  <span class="pct">${op.pct}%</span>
-                </div>
-              </div>`;
-            }).join('');
+          : opponents.map(op => `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
+              <div class="h2h-opponent-name">${getFlag(op.name)}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
+              <div class="h2h-opponent-stats">
+                <span class="win">${op.p1wins}W</span>
+                <span class="loss">${op.p2wins}L</span>
+                <span class="pct">${op.pct}%</span>
+              </div>
+            </div>`).join('');
         dropdown = `<div class="h2h-dropdown">
           ${overallHTML}
           <div style="color:#94a3b8;font-size:12px;margin-bottom:8px">Head to head — tap to see full history</div>
@@ -653,11 +675,9 @@ function render() {
           </div>
         </div>`;
       }).join('');
-
     lb.innerHTML = rankedHTML + unrankedHTML;
   }
 
-  // General stats
   const gs = document.getElementById('general-stats');
   if (data.matches.length === 0) {
     gs.innerHTML = '';
@@ -667,25 +687,18 @@ function render() {
     for (let i = 0; i < data.players.length; i++) {
       for (let j = i + 1; j < data.players.length; j++) {
         const h = getH2H(data.players[i].name, data.players[j].name);
-        if (h.total > maxRivalMatches) {
-          maxRivalMatches = h.total;
-          biggestRivalry = { p1: data.players[i].name, p2: data.players[j].name, ...h };
-        }
+        if (h.total > maxRivalMatches) { maxRivalMatches = h.total; biggestRivalry = { p1: data.players[i].name, p2: data.players[j].name, ...h }; }
       }
     }
     let bestStreakPlayer = '', bestStreak = 0;
-    data.players.forEach(p => {
-      const s = getLongestWinStreak(p.name);
-      if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; }
-    });
+    data.players.forEach(p => { const s = getLongestWinStreak(p.name); if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; } });
     const langStatsHTML = LANGUAGES.map(l => {
       const lPlayers = data.players.filter(p => p.lang === l.code);
       if (lPlayers.length === 0) return '';
       const lNames = lPlayers.map(p => p.name);
       const lMatches = data.matches.filter(m => lNames.includes(m.winner) || lNames.includes(m.loser));
       const lWins = data.matches.filter(m => lNames.includes(m.winner)).length;
-      const lTotal = lMatches.length;
-      const lWinRate = lTotal === 0 ? 0 : Math.round((lWins / lTotal) * 100);
+      const lWinRate = lMatches.length === 0 ? 0 : Math.round((lWins / lMatches.length) * 100);
       return `<div class="lang-stat-row">
         <span><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:6px;">${l.label}</span>
         <span style="display:flex;gap:12px;font-size:13px">
@@ -695,37 +708,22 @@ function render() {
         </span>
       </div>`;
     }).filter(Boolean).join('');
-
     gs.innerHTML = `
       <div class="gen-stats-title">🔢 General Stats</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${data.matches.length}</div></div>
         <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
       </div>
-      ${mostActive ? `<div class="gen-stat-card">
-        <div class="label">Most active player</div>
-        <div class="value">${getFlag(mostActive.name)}${mostActive.name}</div>
-        <div class="sub">${getStats(mostActive.name).total} matches played</div>
-      </div>` : ''}
-      ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')">
-        <div class="label">Biggest rivalry ↗</div>
-        <div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div>
-        <div class="sub">${biggestRivalry.total} matches together</div>
-      </div>` : ''}
-      ${bestStreak > 0 ? `<div class="gen-stat-card">
-        <div class="label">Longest win streak</div>
-        <div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div>
-        <div class="sub">${bestStreak} wins in a row</div>
-      </div>` : ''}
+      ${mostActive ? `<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getFlag(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches played</div></div>` : ''}
+      ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')"><div class="label">Biggest rivalry ↗</div><div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div><div class="sub">${biggestRivalry.total} matches together</div></div>` : ''}
+      ${bestStreak > 0 ? `<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div><div class="sub">${bestStreak} wins in a row</div></div>` : ''}
       ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div><div class="gen-stat-card">${langStatsHTML}</div>` : ''}`;
   }
 
-  // Player selects
   const playerOptions = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
   document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + playerOptions;
   document.getElementById('loser').innerHTML = '<option value="">Select loser...</option>' + playerOptions;
 
-  // History
   const hl = document.getElementById('history-list');
   if (data.matches.length === 0) {
     hl.innerHTML = '<div class="empty">No matches logged yet!</div>';
@@ -757,7 +755,6 @@ function render() {
     }).join('');
   }
 
-  // Players list
   const pl = document.getElementById('player-list');
   if (data.players.length === 0) {
     pl.innerHTML = '<div class="empty">No players yet!</div>';
@@ -793,7 +790,8 @@ function render() {
       </div>`;
     }).join('');
   }
- renderAdminState();
+
+  renderAdminState();
 }
 
 window.switchTab = switchTab;
@@ -813,51 +811,11 @@ window.exportData = exportData;
 window.importData = importData;
 window.resetData = resetData;
 window.saveSettings = saveSettings;
-
-window.showAdminLogin = function() {
-  document.getElementById('admin-overlay').style.display = 'flex';
-  setTimeout(() => document.getElementById('admin-username').focus(), 100);
-}
-
-window.hideAdminLogin = function() {
-  document.getElementById('admin-overlay').style.display = 'none';
-  document.getElementById('admin-username').value = '';
-  document.getElementById('admin-password').value = '';
-}
-
-window.attemptLogin = async function() {
-  const username = document.getElementById('admin-username').value.trim();
-  const password = document.getElementById('admin-password').value;
-  try {
-    const adminRef = doc(db, 'admin', 'credentials');
-    const snap = await getDoc(adminRef);
-    if (snap.exists()) {
-      const creds = snap.data();
-      if (username === creds.username && password === creds.password) {
-        sessionStorage.setItem('isAdmin', 'true');
-        window.hideAdminLogin();
-        showMessage('Welcome admin! 👋', 'success');
-        window.renderAdminState();
-      } else {
-        showMessage('Wrong username or password!', 'error');
-      }
-    }
-  } catch(e) {
-    showMessage('Login error!', 'error');
-  }
-}
-
-function renderAdminState() {
-  const isAdmin = sessionStorage.getItem('isAdmin') === 'true';
-  const locked = document.getElementById('admin-locked');
-  const unlocked = document.getElementById('admin-unlocked');
-  const content = document.getElementById('admin-content');
-  if (locked) locked.style.display = isAdmin ? 'none' : 'block';
-  if (unlocked) unlocked.style.display = isAdmin ? 'block' : 'none';
-  if (content) content.style.display = isAdmin ? 'block' : 'none';
-
-}
+window.showAdminLogin = showAdminLogin;
+window.hideAdminLogin = hideAdminLogin;
+window.attemptLogin = attemptLogin;
 window.renderAdminState = renderAdminState;
+
 render();
 </script>
 </body>
