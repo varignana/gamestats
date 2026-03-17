@@ -381,6 +381,8 @@ async function attemptLogin() {
     const snap = await getDoc(adminRef);
     if (snap.exists()) {
       const creds = snap.data();
+      console.log('DB username:', JSON.stringify(creds.username), 'DB password:', JSON.stringify(creds.password));
+      console.log('Input username:', JSON.stringify(username), 'Input password:', JSON.stringify(password));
       if (username === creds.username && password === creds.password) {
         sessionStorage.setItem('isAdmin', 'true');
         hideAdminLogin();
