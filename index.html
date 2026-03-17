@@ -1056,6 +1056,7 @@ function render() {
           </span>
           <div style="display:flex;gap:6px;align-items:center">
             <span style="color:#475569;font-size:12px">${m.date}</span>
+            ${isPending && isAdmin ? `<button class="btn-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-reject" onclick="rejectMatch(${i})">❌</button>` : ''}
             ${canEdit ? `<div class="btn-actions">
               <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
               <button class="btn-small btn-delete" onclick="deleteMatch(${i})">🗑️</button>
