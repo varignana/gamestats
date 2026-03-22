@@ -689,12 +689,12 @@ async function logMatch() {
   }
 
   const today = new Date().toLocaleDateString();
-  const duplicate = data.matches.find(m =>
+  const duplicates = data.matches.filter(m =>
     m.status === 'pending' &&
     ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
     m.date === today
   );
-  if (duplicate) {
+  if (duplicates.length >= 3) {
     showMessage('A pending match between these players already exists today!', 'error'); return;
   }
 
