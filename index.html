@@ -167,6 +167,8 @@
         </div>
         <div class="elo-info-body" id="elo-info-body">
           The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one. Losing to a weaker player costs you more points. This means your rating reflects the true quality of your wins, not just how many games you've played.
+<br><br>
+<strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). Your new ELO = your ELO + 32 × (result - expected score), where result is 1 for a win and 0 for a loss.
         </div>
       </div>
 
