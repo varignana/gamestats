@@ -35,7 +35,8 @@
   .row { display: flex; justify-content: space-between; align-items: center; }
   .win { color: #4ade80; font-weight: 700; }
   .loss { color: #f87171; font-weight: 700; }
-  .pct { background: #0f172a; border-radius: 6px; padding: 2px 8px; font-weight: 800; color: #38bdf8; font-size: 13px; }
+  .pct { background: #0f172a; border-radius: 6px; padding: 2px 8px; font-weight: 800; color: #94a3b8; font-size: 12px; }
+  .elo-badge { background: #0f172a; border-radius: 6px; padding: 2px 8px; font-weight: 800; color: #38bdf8; font-size: 13px; }
   .message { padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; text-align: center; font-weight: 600; }
   .message.info { background: #1e40af; color: #bfdbfe; }
   .message.success { background: #14532d; color: #86efac; }
@@ -50,6 +51,7 @@
   .tab.active { display: block; }
   .bar-bg { background: #0f172a; border-radius: 4px; height: 6px; margin-top: 6px; }
   .bar-fill { background: #38bdf8; border-radius: 4px; height: 6px; }
+  .bar-fill-elo { background: linear-gradient(90deg, #38bdf8, #818cf8); border-radius: 4px; height: 6px; }
   .edit-row { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
   .edit-row select, .edit-row input { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
   .btn-actions { display: flex; gap: 6px; }
@@ -116,6 +118,14 @@
   .result-btn.active-won { background:#38bdf8; color:#0f172a; }
   .result-btn.active-lost { background:#ef4444; color:white; }
   .result-btn.inactive { background:#1e293b; color:#94a3b8; }
+  .elo-info-box { background:#0f172a; border-radius:10px; padding:12px 16px; margin-bottom:16px; border:1px solid #334155; }
+  .elo-info-header { display:flex; justify-content:space-between; align-items:center; cursor:pointer; }
+  .elo-info-header span { color:#38bdf8; font-size:13px; font-weight:700; }
+  .elo-info-body { color:#94a3b8; font-size:12px; line-height:1.6; margin-top:10px; display:none; }
+  .elo-info-body.open { display:block; }
+  .team-elo-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #334155; }
+  .team-elo-row:last-child { border-bottom:none; }
+  .team-elo-medal { font-size:16px; margin-right:8px; }
 </style>
 </head>
 <body>
@@ -148,6 +158,18 @@
     <!-- STATS TAB -->
     <div id="tab-dashboard" class="tab active">
       <div class="lang-filter" id="lang-filter"></div>
+
+      <!-- ELO Info Box -->
+      <div class="elo-info-box">
+        <div class="elo-info-header" onclick="toggleEloInfo()">
+          <span>ℹ️ How is the ranking calculated?</span>
+          <span id="elo-info-arrow">▼</span>
+        </div>
+        <div class="elo-info-body" id="elo-info-body">
+          The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one. Losing to a weaker player costs you more points. This means your rating reflects the true quality of your wins, not just how many games you've played.
+        </div>
+      </div>
+
       <div class="section-title">🏆 Leaderboard</div>
       <div id="leaderboard"><div class="loading">Loading data...</div></div>
       <div id="general-stats" class="gen-stats"></div>
@@ -316,6 +338,9 @@ const LANGUAGES = [
   { code: 'pt', label: 'Portuguese', country: 'pt' },
 ];
 
+const ELO_K = 32;
+const ELO_BASE = 1000;
+
 let data = { players: [], matches: [] };
 let settings = { minMatches: 0 };
 let playerPasswords = {};
@@ -326,6 +351,7 @@ let activeLang = 'all';
 let currentPlayer = null;
 let isAdmin = false;
 let matchResult = 'won';
+let eloInfoOpen = false;
 
 function setSyncStatus(state) {
   const dot = document.getElementById('sync-dot');
@@ -420,6 +446,22 @@ function getConfirmed() {
   return data.matches.filter(m => m.status === 'confirmed' || !m.status);
 }
 
+// ---- ELO CALCULATION ----
+function calculateAllElos() {
+  const ratings = {};
+  data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
+  const confirmed = getConfirmed();
+  confirmed.forEach(m => {
+    const rW = ratings[m.winner] || ELO_BASE;
+    const rL = ratings[m.loser] || ELO_BASE;
+    const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+    const expectedL = 1 - expectedW;
+    ratings[m.winner] = Math.round(rW + ELO_K * (1 - expectedW));
+    ratings[m.loser] = Math.round(rL + ELO_K * (0 - expectedL));
+  });
+  return ratings;
+}
+
 function getStats(name) {
   const confirmed = getConfirmed();
   const wins = confirmed.filter(m => m.winner === name).length;
@@ -451,6 +493,12 @@ function getLongestWinStreak(name) {
 function getPendingForPlayer(name) {
   return data.matches.map((m, i) => ({ ...m, idx: i }))
     .filter(m => m.status === 'pending' && m.loser === name);
+}
+
+function toggleEloInfo() {
+  eloInfoOpen = !eloInfoOpen;
+  document.getElementById('elo-info-body').className = 'elo-info-body' + (eloInfoOpen ? ' open' : '');
+  document.getElementById('elo-info-arrow').textContent = eloInfoOpen ? '▲' : '▼';
 }
 
 function setResult(result) {
@@ -709,6 +757,7 @@ async function saveEditMatch(index) {
 function openH2H(p1, p2) {
   selectedPlayer = null;
   const h = getH2H(p1, p2);
+  const eloRatings = calculateAllElos();
   const matches = getConfirmed().filter(m =>
     (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
   ).reverse();
@@ -727,12 +776,12 @@ function openH2H(p1, p2) {
       <div class="h2h-header-names">
         <div class="h2h-header-player">
           <span>${getFlag(p1)}${p1}</span>
-          <span>${h.p1wins} wins</span>
+          <span style="color:#38bdf8;font-size:13px">ELO ${eloRatings[p1] || ELO_BASE}</span>
         </div>
         <div class="h2h-vs">VS</div>
         <div class="h2h-header-player">
           <span>${getFlag(p2)}${p2}</span>
-          <span>${h.p2wins} wins</span>
+          <span style="color:#38bdf8;font-size:13px">ELO ${eloRatings[p2] || ELO_BASE}</span>
         </div>
       </div>
       <div class="h2h-score">
@@ -807,6 +856,10 @@ async function resetData() {
 function render() {
   if (sessionStorage.getItem('isAdmin') === 'true') isAdmin = true;
   if (sessionStorage.getItem('currentPlayer')) currentPlayer = sessionStorage.getItem('currentPlayer');
+
+  const eloRatings = calculateAllElos();
+  const maxElo = Math.max(...Object.values(eloRatings), ELO_BASE);
+  const minElo = Math.min(...Object.values(eloRatings), ELO_BASE);
 
   // topbar
   const topbarUser = document.getElementById('topbar-user');
@@ -883,10 +936,9 @@ function render() {
   const minM = settings.minMatches || 0;
   const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
   const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
-  ranked.sort((a, b) => {
-    const sa = getStats(a.name), sb = getStats(b.name);
-    return sb.pct - sa.pct || sb.wins - sa.wins || sb.total - sa.total;
-  });
+
+  // sort by ELO
+  ranked.sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE));
 
   const lb = document.getElementById('leaderboard');
   if (filteredPlayers.length === 0) {
@@ -895,6 +947,8 @@ function render() {
     const medals = ['🥇', '🥈', '🥉'];
     const rankedHTML = ranked.map((p, i) => {
       const s = getStats(p.name);
+      const elo = eloRatings[p.name] || ELO_BASE;
+      const eloBarWidth = maxElo === minElo ? 50 : Math.round(((elo - minElo) / (maxElo - minElo)) * 100);
       const isSelected = selectedPlayer === p.name;
       const flag = getFlag(p.name);
       let dropdown = '';
@@ -932,13 +986,14 @@ function render() {
             <span class="medal">${medals[i] || (i + 1) + '.'}</span>
             <span style="font-weight:700;font-size:16px">${flag}${p.name}</span>
           </div>
-          <div style="display:flex;gap:10px;align-items:center">
-            <span class="win">${s.wins}W</span>
-            <span class="loss">${s.losses}L</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="elo-badge">ELO ${elo}</span>
+            <span class="win" style="font-size:13px">${s.wins}W</span>
+            <span class="loss" style="font-size:13px">${s.losses}L</span>
             <span class="pct">${s.pct}%</span>
           </div>
         </div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${s.pct}%"></div></div>
+        <div class="bar-bg"><div class="bar-fill-elo" style="width:${eloBarWidth}%"></div></div>
         ${dropdown}
       </div>`;
     }).join('');
@@ -947,16 +1002,17 @@ function render() {
       `<div style="color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;">Unranked (less than ${minM} match${minM !== 1 ? 'es' : ''})</div>` +
       unranked.map(p => {
         const s = getStats(p.name);
+        const elo = eloRatings[p.name] || ELO_BASE;
         return `<div class="card" style="opacity:0.6">
           <div class="row">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="unranked">—</span>
               <span style="font-weight:700">${getFlag(p.name)}${p.name}</span>
             </div>
-            <div style="display:flex;gap:10px;align-items:center">
-              <span class="win">${s.wins}W</span>
-              <span class="loss">${s.losses}L</span>
-              <span style="color:#475569;font-size:12px">${s.total} played</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="elo-badge">ELO ${elo}</span>
+              <span class="win" style="font-size:13px">${s.wins}W</span>
+              <span class="loss" style="font-size:13px">${s.losses}L</span>
             </div>
           </div>
         </div>`;
@@ -964,10 +1020,53 @@ function render() {
     lb.innerHTML = rankedHTML + unrankedHTML;
   }
 
-  // general stats
+  // general stats + language team ELO
   const gs = document.getElementById('general-stats');
   const confirmedMatches = getConfirmed();
-  if (confirmedMatches.length === 0) {
+
+  // language team ELO rankings
+  const teamEloHTML = (() => {
+    const teams = LANGUAGES.map(l => {
+      const lPlayers = data.players.filter(p => p.lang === l.code);
+      if (lPlayers.length === 0) return null;
+      const avgElo = Math.round(lPlayers.reduce((sum, p) => sum + (eloRatings[p.name] || ELO_BASE), 0) / lPlayers.length);
+      const totalWins = confirmedMatches.filter(m => lPlayers.some(p => p.name === m.winner)).length;
+      const totalMatches = confirmedMatches.filter(m => lPlayers.some(p => p.name === m.winner || p.name === m.loser)).length;
+      const winRate = totalMatches === 0 ? 0 : Math.round((totalWins / totalMatches) * 100);
+      return { ...l, avgElo, lPlayers, totalMatches, winRate };
+    }).filter(Boolean);
+
+    if (teams.length === 0) return '';
+
+    teams.sort((a, b) => b.avgElo - a.avgElo);
+    const teamMedals = ['🥇', '🥈', '🥉'];
+    const maxTeamElo = Math.max(...teams.map(t => t.avgElo));
+    const minTeamElo = Math.min(...teams.map(t => t.avgElo));
+
+    return `<div class="gen-stats-title">🌍 Language Team Rankings</div>
+      <div class="gen-stat-card">
+        ${teams.map((t, i) => {
+          const barW = maxTeamElo === minTeamElo ? 50 : Math.round(((t.avgElo - minTeamElo) / (maxTeamElo - minTeamElo)) * 100);
+          return `<div class="team-elo-row">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="team-elo-medal">${teamMedals[i] || (i+1)+'.'}</span>
+              <img src="https://flagcdn.com/20x15/${t.country}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;">
+              <div>
+                <div style="font-weight:700;font-size:14px">${t.label}</div>
+                <div style="color:#64748b;font-size:11px">${t.lPlayers.length} players · ${t.totalMatches} matches</div>
+                <div class="bar-bg" style="width:120px;margin-top:4px"><div class="bar-fill-elo" style="width:${barW}%"></div></div>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="elo-badge">ELO ${t.avgElo}</div>
+              <div style="color:#94a3b8;font-size:11px;margin-top:2px">${t.winRate}% win</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  })();
+
+  if (confirmedMatches.length === 0 && !teamEloHTML) {
     gs.innerHTML = '';
   } else {
     const mostActive = [...data.players].sort((a, b) => getStats(b.name).total - getStats(a.name).total)[0];
@@ -979,33 +1078,28 @@ function render() {
       }
     }
     let bestStreakPlayer = '', bestStreak = 0;
-    data.players.forEach(p => { const s = getLongestWinStreak(p.name); if (s > bestStreak) { bestStreak = s; bestStreakPlayer = p.name; } });
-    const langStatsHTML = LANGUAGES.map(l => {
-      const lPlayers = data.players.filter(p => p.lang === l.code);
-      if (lPlayers.length === 0) return '';
-      const lNames = lPlayers.map(p => p.name);
-      const lMatches = confirmedMatches.filter(m => lNames.includes(m.winner) || lNames.includes(m.loser));
-      const lWins = confirmedMatches.filter(m => lNames.includes(m.winner)).length;
-      const lWinRate = lMatches.length === 0 ? 0 : Math.round((lWins / lMatches.length) * 100);
-      return `<div class="lang-stat-row">
-        <span><img src="https://flagcdn.com/20x15/${l.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:6px;">${l.label}</span>
-        <span style="display:flex;gap:12px;font-size:13px">
-          <span style="color:#94a3b8">${lPlayers.length} players</span>
-          <span style="color:#94a3b8">${lMatches.length} matches</span>
-          <span class="pct">${lWinRate}%</span>
-        </span>
-      </div>`;
-    }).filter(Boolean).join('');
+    data.players.forEach(p => {
+      const confirmed = getConfirmed();
+      let best = 0, current = 0;
+      confirmed.forEach(m => {
+        if (m.winner === p.name) { current++; best = Math.max(best, current); }
+        else if (m.loser === p.name) { current = 0; }
+      });
+      if (best > bestStreak) { bestStreak = best; bestStreakPlayer = p.name; }
+    });
+
     gs.innerHTML = `
+      ${confirmedMatches.length > 0 ? `
       <div class="gen-stats-title">🔢 General Stats</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${confirmedMatches.length}</div></div>
         <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
       </div>
-      ${mostActive ? `<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getFlag(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches played</div></div>` : ''}
+      ${mostActive ? `<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getFlag(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name] || ELO_BASE}</div></div>` : ''}
       ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')"><div class="label">Biggest rivalry ↗</div><div class="value">${getFlag(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getFlag(biggestRivalry.p2)}${biggestRivalry.p2}</div><div class="sub">${biggestRivalry.total} matches together</div></div>` : ''}
       ${bestStreak > 0 ? `<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getFlag(bestStreakPlayer)}${bestStreakPlayer}</div><div class="sub">${bestStreak} wins in a row</div></div>` : ''}
-      ${langStatsHTML ? `<div class="gen-stats-title">🌍 Language Teams</div><div class="gen-stat-card">${langStatsHTML}</div>` : ''}`;
+      ` : ''}
+      ${teamEloHTML}`;
   }
 
   // pending matches
@@ -1076,6 +1170,7 @@ function render() {
   } else {
     pl.innerHTML = data.players.map(p => {
       const s = getStats(p.name);
+      const elo = eloRatings[p.name] || ELO_BASE;
       const isEditing = editingPlayer === p.name;
       const langObj = LANGUAGES.find(l => l.code === p.lang);
       let editSection = '';
@@ -1094,8 +1189,9 @@ function render() {
       return `<div class="card">
         <div class="row">
           <span style="font-weight:700">${langObj ? flagImg(langObj.code) : ''}${p.name}</span>
-          <div style="display:flex;gap:10px;align-items:center">
-            <span style="color:#94a3b8;font-size:13px">${s.total} matches · ${s.pct}% win</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="elo-badge">ELO ${elo}</span>
+            <span style="color:#94a3b8;font-size:12px">${s.total} matches</span>
             <div class="btn-actions">
               <button class="btn-small btn-edit" onclick="startEditPlayer('${p.name}')">✏️</button>
               <button class="btn-small btn-delete" onclick="deletePlayer('${p.name}')">🗑️</button>
@@ -1138,6 +1234,7 @@ window.playerLogout = playerLogout;
 window.scrollToPending = scrollToPending;
 window.changePassword = changePassword;
 window.setResult = setResult;
+window.toggleEloInfo = toggleEloInfo;
 
 render();
 </script>
