@@ -10,8 +10,8 @@
   .container { max-width: 600px; margin: 0 auto; }
   h1 { font-size: 28px; font-weight: 800; color: #38bdf8; text-align: center; margin-bottom: 4px; }
   .subtitle { color: #94a3b8; text-align: center; margin-bottom: 12px; font-size: 14px; }
-  .nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 24px; }
-  .nav button { padding: 10px 0; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; font-size: 12px; transition: all 0.2s; }
+  .nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 24px; }
+  .nav button { padding: 10px 0; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; font-size: 11px; transition: all 0.2s; }
   .nav button.active { background: #38bdf8; color: #0f172a; }
   .nav button:not(.active) { background: #1e293b; color: #94a3b8; }
   .card { background: #1e293b; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px; border: 1px solid transparent; }
@@ -126,6 +126,22 @@
   .team-elo-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #334155; }
   .team-elo-row:last-child { border-bottom:none; }
   .team-elo-medal { font-size:16px; margin-right:8px; }
+  /* Odds tab */
+  .odds-header { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+  .odds-header-info { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .odds-row { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:8px; }
+  .odds-row-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .odds-name { font-weight:700; font-size:15px; display:flex; align-items:center; gap:6px; }
+  .odds-difficulty { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+  .odds-difficulty.hard { background:#ef4444; }
+  .odds-difficulty.medium { background:#f59e0b; }
+  .odds-difficulty.easy { background:#4ade80; }
+  .odds-stats { display:flex; gap:12px; font-size:13px; }
+  .odds-win-bar-bg { background:#0f172a; border-radius:4px; height:8px; position:relative; }
+  .odds-win-bar { border-radius:4px; height:8px; transition: width 0.4s; }
+  .win-prob-label { font-size:11px; color:#94a3b8; display:flex; justify-content:space-between; margin-top:4px; }
+  .elo-change-win { color:#4ade80; font-weight:700; font-size:12px; }
+  .elo-change-loss { color:#f87171; font-weight:700; font-size:12px; }
 </style>
 </head>
 <body>
@@ -150,6 +166,7 @@
     <div id="message" class="message info" style="display:none"></div>
     <div class="nav">
       <button class="active" onclick="switchTab('dashboard', this)">📊 Stats</button>
+      <button onclick="switchTab('odds', this)">🎯 Odds</button>
       <button onclick="switchTab('log', this)">➕ Log</button>
       <button onclick="switchTab('history', this)">📋 History</button>
       <button onclick="switchTab('players', this)">👥 Players</button>
@@ -158,8 +175,6 @@
     <!-- STATS TAB -->
     <div id="tab-dashboard" class="tab active">
       <div class="lang-filter" id="lang-filter"></div>
-
-      <!-- ELO Info Box -->
       <div class="elo-info-box">
         <div class="elo-info-header" onclick="toggleEloInfo()">
           <span>ℹ️ How is the ranking calculated?</span>
@@ -167,14 +182,29 @@
         </div>
         <div class="elo-info-body" id="elo-info-body">
           The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one. Losing to a weaker player costs you more points. This means your rating reflects the true quality of your wins, not just how many games you've played.
-<br><br>
-<strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). Your new ELO = your ELO + 32 × (result - expected score), where result is 1 for a win and 0 for a loss.
+          <br><br>
+          <strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). Your new ELO = your ELO + 32 × (result - expected score), where result is 1 for a win and 0 for a loss.
         </div>
       </div>
-
       <div class="section-title">🏆 Leaderboard</div>
       <div id="leaderboard"><div class="loading">Loading data...</div></div>
       <div id="general-stats" class="gen-stats"></div>
+    </div>
+
+    <!-- ODDS TAB -->
+    <div id="tab-odds" class="tab">
+      <div class="section-title">🎯 Match Odds</div>
+      <div class="odds-header">
+        <label>View odds for</label>
+        <select id="odds-player-select" onchange="render()" style="margin-bottom:0">
+          <option value="">Select player...</option>
+        </select>
+        <div class="odds-header-info" id="odds-player-info" style="display:none">
+          <span id="odds-player-name" style="font-weight:700;font-size:15px"></span>
+          <span class="elo-badge" id="odds-player-elo"></span>
+        </div>
+      </div>
+      <div id="odds-list"><div class="empty">Select a player to see their matchup odds</div></div>
     </div>
 
     <!-- LOG TAB -->
@@ -312,9 +342,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ============================================
-// REPLACE THESE WITH YOUR FIREBASE VALUES
-// ============================================
 const firebaseConfig = {
   apiKey: "AIzaSyC4FQBnDaGKu_goi2V1aVYNPjTUAgvpDCc",
   authDomain: "gamestats-firebase.firebaseapp.com",
@@ -323,7 +350,6 @@ const firebaseConfig = {
   messagingSenderId: "767922445574",
   appId: "1:767922445574:web:dbd33d8f25da0d00d4d287"
 };
-// ============================================
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -448,7 +474,6 @@ function getConfirmed() {
   return data.matches.filter(m => m.status === 'confirmed' || !m.status);
 }
 
-// ---- ELO CALCULATION ----
 function calculateAllElos() {
   const ratings = {};
   data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
@@ -462,6 +487,32 @@ function calculateAllElos() {
     ratings[m.loser] = Math.round(rL + ELO_K * (0 - expectedL));
   });
   return ratings;
+}
+
+function calculateEloChanges() {
+  const ratings = {};
+  data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
+  const changes = [];
+  data.matches.forEach(m => {
+    if (m.status === 'pending') { changes.push(null); return; }
+    const rW = ratings[m.winner] || ELO_BASE;
+    const rL = ratings[m.loser] || ELO_BASE;
+    const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+    const expectedL = 1 - expectedW;
+    const changeW = Math.round(ELO_K * (1 - expectedW));
+    const changeL = Math.round(ELO_K * (0 - expectedL));
+    ratings[m.winner] = rW + changeW;
+    ratings[m.loser] = rL + changeL;
+    changes.push({ winner: changeW, loser: changeL });
+  });
+  return changes;
+}
+
+function getEloOdds(playerElo, opponentElo) {
+  const winProb = Math.round((1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400))) * 100);
+  const changeWin = Math.round(ELO_K * (1 - winProb / 100));
+  const changeLoss = Math.round(ELO_K * (0 - (1 - winProb / 100)));
+  return { winProb, lossProb: 100 - winProb, changeWin, changeLoss };
 }
 
 function getStats(name) {
@@ -480,16 +531,6 @@ function getH2H(p1, p2) {
   const total = p1wins + p2wins;
   const pct = total === 0 ? 0 : Math.round((p1wins / total) * 100);
   return { p1wins, p2wins, total, pct };
-}
-
-function getLongestWinStreak(name) {
-  const confirmed = getConfirmed();
-  let best = 0, current = 0;
-  confirmed.forEach(m => {
-    if (m.winner === name) { current++; best = Math.max(best, current); }
-    else if (m.loser === name) { current = 0; }
-  });
-  return best;
 }
 
 function getPendingForPlayer(name) {
@@ -513,7 +554,6 @@ function setResult(result) {
   }
 }
 
-// ---- ADMIN AUTH ----
 function showAdminLogin() {
   document.getElementById('admin-overlay').style.display = 'flex';
   setTimeout(() => document.getElementById('admin-username').focus(), 100);
@@ -551,7 +591,6 @@ function adminLogout() {
   showMessage('Admin logged out!', 'info');
 }
 
-// ---- PLAYER AUTH ----
 function showPlayerLogin() {
   const select = document.getElementById('player-login-select');
   select.innerHTML = '<option value="">Select player...</option>' +
@@ -587,7 +626,7 @@ function playerLogout() {
 }
 
 function scrollToPending() {
-  const historyBtn = document.querySelectorAll('.nav button')[2];
+  const historyBtn = document.querySelectorAll('.nav button')[3];
   switchTab('history', historyBtn);
   setTimeout(() => {
     const el = document.getElementById('pending-section');
@@ -595,7 +634,6 @@ function scrollToPending() {
   }, 200);
 }
 
-// ---- PLAYER MANAGEMENT ----
 async function addPlayer() {
   const name = document.getElementById('newPlayer').value.trim();
   const lang = document.getElementById('newPlayerLang').value;
@@ -674,7 +712,6 @@ async function changePassword() {
   showMessage('Password changed!', 'success');
 }
 
-// ---- MATCH MANAGEMENT ----
 async function logMatch() {
   let winner, loser;
   if (isAdmin) {
@@ -697,7 +734,7 @@ async function logMatch() {
     m.date === today
   );
   if (duplicates.length >= 3) {
-    showMessage('A pending match between these players already exists today!', 'error'); return;
+    showMessage('Maximum 3 pending matches between same players per day!', 'error'); return;
   }
 
   const status = isAdmin ? 'confirmed' : 'pending';
@@ -854,7 +891,6 @@ async function resetData() {
   showMessage('All data reset.', 'info');
 }
 
-// ---- RENDER ----
 function render() {
   if (sessionStorage.getItem('isAdmin') === 'true') isAdmin = true;
   if (sessionStorage.getItem('currentPlayer')) currentPlayer = sessionStorage.getItem('currentPlayer');
@@ -925,6 +961,74 @@ function render() {
     }
   }
 
+  // odds tab
+  const oddsSelect = document.getElementById('odds-player-select');
+  const currentOddsSelection = oddsSelect.value;
+  oddsSelect.innerHTML = '<option value="">Select player...</option>' +
+    [...data.players].sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE))
+      .map(p => `<option value="${p.name}" ${p.name === currentOddsSelection ? 'selected' : ''}>${p.name} (ELO ${eloRatings[p.name] || ELO_BASE})</option>`).join('');
+
+  // auto-select logged in player or strongest player
+  if (!oddsSelect.value) {
+    if (currentPlayer) {
+      oddsSelect.value = currentPlayer;
+    } else if (data.players.length > 0) {
+      const strongest = [...data.players].sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE))[0];
+      oddsSelect.value = strongest.name;
+    }
+  }
+
+  const selectedOddsPlayer = oddsSelect.value;
+  const oddsList = document.getElementById('odds-list');
+  const oddsPlayerInfo = document.getElementById('odds-player-info');
+
+  if (selectedOddsPlayer) {
+    const playerElo = eloRatings[selectedOddsPlayer] || ELO_BASE;
+    oddsPlayerInfo.style.display = 'flex';
+    document.getElementById('odds-player-name').innerHTML = `${getFlag(selectedOddsPlayer)}${selectedOddsPlayer}`;
+    document.getElementById('odds-player-elo').textContent = `ELO ${playerElo}`;
+
+    const opponents = data.players
+      .filter(p => p.name !== selectedOddsPlayer)
+      .map(p => {
+        const oppElo = eloRatings[p.name] || ELO_BASE;
+        const odds = getEloOdds(playerElo, oppElo);
+        const h2h = getH2H(selectedOddsPlayer, p.name);
+        return { ...p, oppElo, ...odds, h2h };
+      })
+      .sort((a, b) => a.winProb - b.winProb); // hardest first
+
+    oddsList.innerHTML = opponents.map(op => {
+      const difficulty = op.winProb < 40 ? 'hard' : op.winProb <= 60 ? 'medium' : 'easy';
+      const barColor = difficulty === 'hard' ? '#ef4444' : difficulty === 'medium' ? '#f59e0b' : '#4ade80';
+      return `<div class="odds-row">
+        <div class="odds-row-top">
+          <div class="odds-name">
+            <span class="odds-difficulty ${difficulty}"></span>
+            ${getFlag(op.name)}${op.name}
+            <span style="color:#64748b;font-size:12px">ELO ${op.oppElo}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="elo-change-win">+${op.changeWin}</span>
+            <span style="color:#475569;font-size:11px">/</span>
+            <span class="elo-change-loss">${op.changeLoss}</span>
+          </div>
+        </div>
+        <div class="odds-win-bar-bg">
+          <div class="odds-win-bar" style="width:${op.winProb}%;background:${barColor}"></div>
+        </div>
+        <div class="win-prob-label">
+          <span style="color:${barColor};font-weight:700">${op.winProb}% win</span>
+          <span>${op.lossProb}% loss</span>
+        </div>
+        ${op.h2h.total > 0 ? `<div style="color:#475569;font-size:11px;margin-top:6px">H2H: ${op.h2h.p1wins}W ${op.h2h.p2wins}L from ${op.h2h.total} matches</div>` : ''}
+      </div>`;
+    }).join('');
+  } else {
+    oddsPlayerInfo.style.display = 'none';
+    oddsList.innerHTML = '<div class="empty">Select a player to see their matchup odds</div>';
+  }
+
   // language filter
   const lf = document.getElementById('lang-filter');
   const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
@@ -938,8 +1042,6 @@ function render() {
   const minM = settings.minMatches || 0;
   const ranked = filteredPlayers.filter(p => getStats(p.name).total >= minM);
   const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
-
-  // sort by ELO
   ranked.sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE));
 
   const lb = document.getElementById('leaderboard');
@@ -1022,11 +1124,10 @@ function render() {
     lb.innerHTML = rankedHTML + unrankedHTML;
   }
 
-  // general stats + language team ELO
+  // general stats
   const gs = document.getElementById('general-stats');
   const confirmedMatches = getConfirmed();
 
-  // language team ELO rankings
   const teamEloHTML = (() => {
     const teams = LANGUAGES.map(l => {
       const lPlayers = data.players.filter(p => p.lang === l.code);
@@ -1037,14 +1138,11 @@ function render() {
       const winRate = totalMatches === 0 ? 0 : Math.round((totalWins / totalMatches) * 100);
       return { ...l, avgElo, lPlayers, totalMatches, winRate };
     }).filter(Boolean);
-
     if (teams.length === 0) return '';
-
     teams.sort((a, b) => b.avgElo - a.avgElo);
     const teamMedals = ['🥇', '🥈', '🥉'];
     const maxTeamElo = Math.max(...teams.map(t => t.avgElo));
     const minTeamElo = Math.min(...teams.map(t => t.avgElo));
-
     return `<div class="gen-stats-title">🌍 Language Team Rankings</div>
       <div class="gen-stat-card">
         ${teams.map((t, i) => {
@@ -1089,7 +1187,6 @@ function render() {
       });
       if (best > bestStreak) { bestStreak = best; bestStreakPlayer = p.name; }
     });
-
     gs.innerHTML = `
       ${confirmedMatches.length > 0 ? `
       <div class="gen-stats-title">🔢 General Stats</div>
@@ -1127,6 +1224,7 @@ function render() {
   }
 
   // history
+  const eloChanges = calculateEloChanges();
   const hl = document.getElementById('history-list');
   if (data.matches.length === 0) {
     hl.innerHTML = '<div class="empty">No matches logged yet!</div>';
@@ -1136,6 +1234,7 @@ function render() {
       const isPending = m.status === 'pending';
       const canEdit = isAdmin || (currentPlayer && (m.winner === currentPlayer || m.loser === currentPlayer));
       const isEditing = editingMatch === i;
+      const eloChange = eloChanges[i];
       let editSection = '';
       if (isEditing && canEdit) {
         editSection = `<div class="edit-row">
@@ -1152,6 +1251,7 @@ function render() {
           </span>
           <div style="display:flex;gap:6px;align-items:center">
             <span style="color:#475569;font-size:12px">${m.date}</span>
+            ${eloChange ? `<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>` : ''}
             ${isPending && isAdmin ? `<button class="btn-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-reject" onclick="rejectMatch(${i})">❌</button>` : ''}
             ${canEdit ? `<div class="btn-actions">
               <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
