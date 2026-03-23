@@ -135,7 +135,7 @@
   .odds-difficulty.hard { background:#ef4444; }
   .odds-difficulty.medium { background:#f59e0b; }
   .odds-difficulty.easy { background:#4ade80; }
-  .odds-win-bar-bg { background:#0f172a; border-radius:4px; height:8px; position:relative; }
+  .odds-win-bar-bg { background:#0f172a; border-radius:4px; height:8px; }
   .odds-win-bar { border-radius:4px; height:8px; transition: width 0.4s; }
   .win-prob-label { font-size:11px; color:#94a3b8; display:flex; justify-content:space-between; margin-top:4px; }
   .elo-change-win { color:#4ade80; font-weight:700; font-size:12px; }
@@ -334,9 +334,6 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
 
-// ============================================
-// REPLACE THESE WITH YOUR FIREBASE VALUES
-// ============================================
 const firebaseConfig = {
   apiKey: "AIzaSyD0WVeoMBX9jEsFTPD9KfOJe6gyKZTOlRI",
   authDomain: "gamestats-firebase.firebaseapp.com",
@@ -344,9 +341,8 @@ const firebaseConfig = {
   storageBucket: "gamestats-firebase.firebasestorage.app",
   messagingSenderId: "767922445574",
   appId: "1:767922445574:web:dbd33d8f25da0d00d4d287",
-  measurementId: "G-0J4XXBKZ4B"
+  measurementId: "G-0J4XXBKZ4B
 };
-// ============================================
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -483,9 +479,9 @@ function calculateAllElos() {
     const rW = ratings[m.winner] || ELO_BASE;
     const rL = ratings[m.loser] || ELO_BASE;
     const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
-    const expectedL = 1 - expectedW;
-    ratings[m.winner] = Math.round(rW + ELO_K * (1 - expectedW));
-    ratings[m.loser] = Math.round(rL + ELO_K * (0 - expectedL));
+    const changeW = Math.round(ELO_K * (1 - expectedW));
+    ratings[m.winner] = rW + changeW;
+    ratings[m.loser] = rL - changeW;
   });
   return ratings;
 }
@@ -499,9 +495,8 @@ function calculateEloChanges() {
     const rW = ratings[m.winner] || ELO_BASE;
     const rL = ratings[m.loser] || ELO_BASE;
     const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
-    const expectedL = 1 - expectedW;
     const changeW = Math.round(ELO_K * (1 - expectedW));
-    const changeL = Math.round(ELO_K * (0 - expectedL));
+    const changeL = -changeW;
     ratings[m.winner] = rW + changeW;
     ratings[m.loser] = rL + changeL;
     changes.push({ winner: changeW, loser: changeL });
@@ -510,9 +505,10 @@ function calculateEloChanges() {
 }
 
 function getEloOdds(playerElo, opponentElo) {
-  const winProb = Math.round((1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400))) * 100);
-  const changeWin = Math.round(ELO_K * (1 - winProb / 100));
-  const changeLoss = Math.round(ELO_K * (0 - (1 - winProb / 100)));
+  const expectedW = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
+  const winProb = Math.round(expectedW * 100);
+  const changeWin = Math.round(ELO_K * (1 - expectedW));
+  const changeLoss = -changeWin;
   return { winProb, lossProb: 100 - winProb, changeWin, changeLoss };
 }
 
