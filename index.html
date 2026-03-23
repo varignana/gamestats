@@ -19,6 +19,7 @@
   .card.clickable:hover { border-color: #334155; }
   .card.selected { border-color: #38bdf8; }
   .card.pending { opacity: 0.6; border: 1px dashed #f59e0b; }
+  .card.disputed { opacity: 0.7; border: 1px dashed #ef4444; }
   input, select { width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: #f1f5f9; border: 1px solid #334155; font-size: 15px; margin-bottom: 16px; outline: none; }
   input:focus, select:focus { border-color: #38bdf8; }
   .btn { width: 100%; padding: 14px; background: #38bdf8; color: #0f172a; border: none; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
@@ -50,7 +51,6 @@
   .tab { display: none; }
   .tab.active { display: block; }
   .bar-bg { background: #0f172a; border-radius: 4px; height: 6px; margin-top: 6px; }
-  .bar-fill { background: #38bdf8; border-radius: 4px; height: 6px; }
   .bar-fill-elo { background: linear-gradient(90deg, #38bdf8, #818cf8); border-radius: 4px; height: 6px; }
   .edit-row { display: flex; gap: 6px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
   .edit-row select, .edit-row input { margin-bottom: 0; flex: 1; padding: 8px; font-size: 13px; }
@@ -103,16 +103,20 @@
   .sync-dot.error { background: #ef4444; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .loading { text-align: center; color: #94a3b8; padding: 60px 20px; font-size: 16px; }
-  .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000; }
-  .modal { background:#1e293b; border-radius:16px; padding:24px; width:90%; max-width:360px; }
-  .modal h3 { color:#38bdf8; font-size:18px; font-weight:800; margin-bottom:16px; text-align:center; }
+  .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; z-index:1000; }
+  .modal { background:#1e293b; border-radius:16px; padding:24px; width:90%; max-width:400px; max-height:85vh; overflow-y:auto; }
+  .modal h3 { color:#38bdf8; font-size:18px; font-weight:800; margin-bottom:8px; text-align:center; }
+  .modal p { color:#94a3b8; font-size:13px; text-align:center; margin-bottom:16px; line-height:1.5; }
   .admin-lock-btn { width:100%; padding:12px; background:#334155; color:#94a3b8; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px; }
   .topbar { display:flex; justify-content:space-between; align-items:center; background:#1e293b; border-radius:10px; padding:10px 14px; margin-bottom:16px; }
   .topbar-user { display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; }
   .topbar-actions { display:flex; align-items:center; gap:8px; }
   .pending-badge { background:#f59e0b; color:#0f172a; border-radius:20px; padding:2px 8px; font-size:12px; font-weight:800; cursor:pointer; }
+  .disputed-badge { background:#ef4444; color:white; border-radius:20px; padding:2px 8px; font-size:12px; font-weight:800; }
   .pending-section { background:#1e293b; border-radius:10px; padding:14px; margin-bottom:16px; border: 1px solid #f59e0b; }
   .pending-title { color:#f59e0b; font-size:14px; font-weight:700; margin-bottom:10px; }
+  .disputed-section { background:#1e293b; border-radius:10px; padding:14px; margin-bottom:16px; border: 1px solid #ef4444; }
+  .disputed-title { color:#ef4444; font-size:14px; font-weight:700; margin-bottom:10px; }
   .result-btns { display:flex; gap:8px; margin-bottom:16px; }
   .result-btn { flex:1; padding:12px; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; }
   .result-btn.active-won { background:#38bdf8; color:#0f172a; }
@@ -125,7 +129,6 @@
   .elo-info-body.open { display:block; }
   .team-elo-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #334155; }
   .team-elo-row:last-child { border-bottom:none; }
-  .team-elo-medal { font-size:16px; margin-right:8px; }
   .odds-header { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
   .odds-header-info { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
   .odds-row { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:8px; }
@@ -140,6 +143,9 @@
   .win-prob-label { font-size:11px; color:#94a3b8; display:flex; justify-content:space-between; margin-top:4px; }
   .elo-change-win { color:#4ade80; font-weight:700; font-size:12px; }
   .elo-change-loss { color:#f87171; font-weight:700; font-size:12px; }
+  .approval-match-row { background:#0f172a; border-radius:8px; padding:12px; margin-bottom:8px; }
+  .approval-match-text { font-size:14px; margin-bottom:8px; }
+  .approval-match-actions { display:flex; gap:8px; }
 </style>
 </head>
 <body>
@@ -192,9 +198,7 @@
       <div class="section-title">🎯 Match Odds</div>
       <div class="odds-header">
         <label>View odds for</label>
-        <select id="odds-player-select" onchange="render()" style="margin-bottom:0">
-          <option value="">Select player...</option>
-        </select>
+        <select id="odds-player-select" onchange="render()" style="margin-bottom:0"></select>
         <div class="odds-header-info" id="odds-player-info" style="display:none">
           <span id="odds-player-name" style="font-weight:700;font-size:15px"></span>
           <span class="elo-badge" id="odds-player-elo"></span>
@@ -236,6 +240,10 @@
       <div id="pending-section" class="pending-section" style="display:none">
         <div class="pending-title">⏳ Matches waiting for your confirmation</div>
         <div id="pending-list"></div>
+      </div>
+      <div id="disputed-section" class="disputed-section" style="display:none">
+        <div class="disputed-title">🚨 Disputed matches — admin will resolve</div>
+        <div id="disputed-list"></div>
       </div>
       <div class="section-title">📋 Match History</div>
       <div id="history-list"></div>
@@ -297,6 +305,7 @@
       </div>
     </div>
 
+    <!-- Admin login modal -->
     <div id="admin-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>🔒 Admin Login</h3>
@@ -309,6 +318,7 @@
       </div>
     </div>
 
+    <!-- Player login modal -->
     <div id="player-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>👤 Player Login</h3>
@@ -318,6 +328,26 @@
         <input type="password" id="player-login-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptPlayerLogin()">
         <button class="btn" onclick="attemptPlayerLogin()">Login</button>
         <button class="btn-danger" onclick="hidePlayerLogin()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Forced approval modal -->
+    <div id="approval-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>⏳ Matches to Confirm</h3>
+        <p>You have matches waiting for your confirmation. Please review them before continuing — fair play keeps the stats honest! 🎱</p>
+        <div id="approval-list"></div>
+        <button class="btn" onclick="closeApprovalModal()" id="approval-done-btn" style="display:none">All done — continue!</button>
+      </div>
+    </div>
+
+    <!-- Admin disputed modal -->
+    <div id="admin-disputed-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>🚨 Disputed Matches</h3>
+        <p>The following matches have been disputed by the opponent. Please review and decide.</p>
+        <div id="admin-disputed-list"></div>
+        <button class="btn" onclick="closeAdminDisputedModal()">Done</button>
       </div>
     </div>
 
@@ -376,6 +406,7 @@ let currentPlayer = null;
 let isAdmin = false;
 let matchResult = 'won';
 let eloInfoOpen = false;
+let settingsLoaded = false;
 
 function setSyncStatus(state) {
   const dot = document.getElementById('sync-dot');
@@ -403,6 +434,17 @@ async function saveSettings() {
   render();
 }
 
+// Load settings first before data so unranked filter applies immediately
+onSnapshot(settingsRef, (snap) => {
+  if (snap.exists()) {
+    settings = snap.data();
+    const el = document.getElementById('minMatchesSetting');
+    if (el) el.value = settings.minMatches || 0;
+  }
+  settingsLoaded = true;
+  render();
+});
+
 onSnapshot(dataRef, (snap) => {
   if (snap.exists()) {
     const d = snap.data();
@@ -414,14 +456,6 @@ onSnapshot(dataRef, (snap) => {
   setSyncStatus('live');
   render();
 }, () => setSyncStatus('error'));
-
-onSnapshot(settingsRef, (snap) => {
-  if (snap.exists()) {
-    settings = snap.data();
-    const el = document.getElementById('minMatchesSetting');
-    if (el) el.value = settings.minMatches || 0;
-  }
-});
 
 onSnapshot(playersAuthRef, (snap) => {
   if (snap.exists()) { playerPasswords = snap.data(); }
@@ -491,7 +525,7 @@ function calculateEloChanges() {
   data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
   const changes = [];
   data.matches.forEach(m => {
-    if (m.status === 'pending') { changes.push(null); return; }
+    if (m.status === 'pending' || m.status === 'disputed') { changes.push(null); return; }
     const rW = ratings[m.winner] || ELO_BASE;
     const rL = ratings[m.loser] || ELO_BASE;
     const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
@@ -535,11 +569,15 @@ function getPendingForPlayer(name) {
     .filter(m => m.status === 'pending' && m.loser === name);
 }
 
+function getDisputedMatches() {
+  return data.matches.map((m, i) => ({ ...m, idx: i }))
+    .filter(m => m.status === 'disputed');
+}
+
 function toggleEloInfo() {
   eloInfoOpen = !eloInfoOpen;
   document.getElementById('elo-info-body').className = 'elo-info-body' + (eloInfoOpen ? ' open' : '');
   document.getElementById('elo-info-arrow').textContent = eloInfoOpen ? '▲' : '▼';
-  logEvent(analytics, 'elo_info_toggled', { open: eloInfoOpen });
 }
 
 function setResult(result) {
@@ -552,6 +590,7 @@ function setResult(result) {
   }
 }
 
+// ---- ADMIN AUTH ----
 function showAdminLogin() {
   document.getElementById('admin-overlay').style.display = 'flex';
   setTimeout(() => document.getElementById('admin-username').focus(), 100);
@@ -574,6 +613,11 @@ async function attemptAdminLogin() {
         hideAdminLogin();
         showMessage('Welcome admin! 👋', 'success');
         logEvent(analytics, 'admin_login');
+        // Show disputed matches popup if any
+        const disputed = getDisputedMatches();
+        if (disputed.length > 0) {
+          showAdminDisputedModal();
+        }
         render();
       } else {
         showMessage('Wrong username or password!', 'error');
@@ -591,6 +635,48 @@ function adminLogout() {
   showMessage('Admin logged out!', 'info');
 }
 
+// ---- ADMIN DISPUTED MODAL ----
+function showAdminDisputedModal() {
+  const disputed = getDisputedMatches();
+  if (disputed.length === 0) return;
+  const list = document.getElementById('admin-disputed-list');
+  list.innerHTML = disputed.map(m => `
+    <div class="approval-match-row">
+      <div class="approval-match-text">
+        <span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span>
+        <span style="color:#475569;font-size:12px;margin-left:6px">${m.date}</span>
+        <div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.loser}</div>
+      </div>
+      <div class="approval-match-actions">
+        <button class="btn-confirm" onclick="adminResolveDispute(${m.idx}, 'confirm')">✅ Confirm match</button>
+        <button class="btn-reject" onclick="adminResolveDispute(${m.idx}, 'delete')">🗑️ Delete match</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('admin-disputed-overlay').style.display = 'flex';
+}
+
+function closeAdminDisputedModal() {
+  document.getElementById('admin-disputed-overlay').style.display = 'none';
+}
+
+async function adminResolveDispute(index, action) {
+  if (action === 'confirm') {
+    data.matches[index].status = 'confirmed';
+    showMessage('Match confirmed! ✅', 'success');
+  } else {
+    data.matches.splice(index, 1);
+    showMessage('Match deleted!', 'info');
+  }
+  await save();
+  const disputed = getDisputedMatches();
+  if (disputed.length === 0) {
+    closeAdminDisputedModal();
+  } else {
+    showAdminDisputedModal();
+  }
+}
+
+// ---- PLAYER AUTH ----
 function showPlayerLogin() {
   const select = document.getElementById('player-login-select');
   select.innerHTML = '<option value="">Select player...</option>' +
@@ -612,8 +698,14 @@ async function attemptPlayerLogin() {
     currentPlayer = name;
     sessionStorage.setItem('currentPlayer', name);
     hidePlayerLogin();
-    showMessage('Welcome ' + name + '! 👋', 'success');
     logEvent(analytics, 'player_login', { player_name: name });
+    // Check for pending matches — show forced approval modal
+    const pending = getPendingForPlayer(name);
+    if (pending.length > 0) {
+      showApprovalModal(name);
+    } else {
+      showMessage('Welcome ' + name + '! 👋', 'success');
+    }
     render();
   } else {
     showMessage('Wrong password!', 'error');
@@ -628,6 +720,58 @@ function playerLogout() {
   showMessage('Logged out!', 'info');
 }
 
+// ---- FORCED APPROVAL MODAL ----
+function showApprovalModal(playerName) {
+  const pending = getPendingForPlayer(playerName);
+  if (pending.length === 0) return;
+  const list = document.getElementById('approval-list');
+  list.innerHTML = pending.map(m => `
+    <div class="approval-match-row">
+      <div class="approval-match-text">
+        <span class="win">${getFlag(m.winner)}${m.winner}</span> says they beat you on <strong>${m.date}</strong>
+      </div>
+      <div class="approval-match-actions">
+        <button class="btn-confirm" onclick="approvalConfirm(${m.idx})">✅ Confirm</button>
+        <button class="btn-reject" onclick="approvalDispute(${m.idx})">❌ Dispute</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('approval-done-btn').style.display = 'none';
+  document.getElementById('approval-overlay').style.display = 'flex';
+}
+
+function checkApprovalDone() {
+  const pending = getPendingForPlayer(currentPlayer);
+  if (pending.length === 0) {
+    document.getElementById('approval-done-btn').style.display = 'block';
+  }
+}
+
+async function approvalConfirm(index) {
+  data.matches[index].status = 'confirmed';
+  await save();
+  const el = document.querySelector(`[onclick="approvalConfirm(${index})"]`);
+  if (el) el.closest('.approval-match-row').style.opacity = '0.4';
+  checkApprovalDone();
+}
+
+async function approvalDispute(index) {
+  data.matches[index].status = 'disputed';
+  data.matches[index].disputedBy = currentPlayer;
+  await save();
+  const el = document.querySelector(`[onclick="approvalDispute(${index})"]`);
+  if (el) {
+    const row = el.closest('.approval-match-row');
+    row.style.opacity = '0.4';
+    row.querySelector('.approval-match-actions').innerHTML = '<span style="color:#ef4444;font-size:12px">🚨 Disputed — admin will review</span>';
+  }
+  checkApprovalDone();
+}
+
+function closeApprovalModal() {
+  document.getElementById('approval-overlay').style.display = 'none';
+  showMessage('Welcome ' + currentPlayer + '! 👋', 'success');
+}
+
 function scrollToPending() {
   const historyBtn = document.querySelectorAll('.nav button')[3];
   switchTab('history', historyBtn);
@@ -637,6 +781,7 @@ function scrollToPending() {
   }, 200);
 }
 
+// ---- PLAYER MANAGEMENT ----
 async function addPlayer() {
   const name = document.getElementById('newPlayer').value.trim();
   const lang = document.getElementById('newPlayerLang').value;
@@ -716,6 +861,7 @@ async function changePassword() {
   showMessage('Password changed!', 'success');
 }
 
+// ---- MATCH MANAGEMENT ----
 async function logMatch() {
   let winner, loser;
   if (isAdmin) {
@@ -768,11 +914,21 @@ async function confirmMatch(index) {
 }
 
 async function rejectMatch(index) {
-  if (!confirm('Reject this match?')) return;
-  data.matches.splice(index, 1);
-  await save();
-  logEvent(analytics, 'match_rejected');
-  showMessage('Match rejected!', 'info');
+  const m = data.matches[index];
+  // If the person rejecting is NOT the one who logged it → dispute
+  if (currentPlayer && m.loggedBy !== currentPlayer && m.loser === currentPlayer) {
+    if (!confirm('Dispute this match? It will be sent to admin for review.')) return;
+    data.matches[index].status = 'disputed';
+    data.matches[index].disputedBy = currentPlayer;
+    await save();
+    showMessage('Match disputed — admin will review! 🚨', 'info');
+  } else {
+    // Creator or admin deleting → delete directly
+    if (!confirm('Delete this match?')) return;
+    data.matches.splice(index, 1);
+    await save();
+    showMessage('Match deleted!', 'info');
+  }
 }
 
 async function deleteMatch(index) {
@@ -910,6 +1066,7 @@ function render() {
   const maxElo = Math.max(...Object.values(eloRatings), ELO_BASE);
   const minElo = Math.min(...Object.values(eloRatings), ELO_BASE);
 
+  // topbar
   const topbarUser = document.getElementById('topbar-user');
   const loginBtn = document.getElementById('topbar-login-btn');
   const logoutBtn = document.getElementById('topbar-logout-btn');
@@ -930,6 +1087,16 @@ function render() {
     topbarUser.innerHTML = '🔒 Admin';
     loginBtn.style.display = 'none';
     logoutBtn.style.display = 'none';
+    const disputed = getDisputedMatches();
+    if (disputed.length > 0) {
+      pendingBadge.style.display = 'inline-block';
+      pendingBadge.style.background = '#ef4444';
+      pendingBadge.style.color = 'white';
+      pendingBadge.textContent = `🚨 ${disputed.length} disputed`;
+      pendingBadge.onclick = () => showAdminDisputedModal();
+    } else {
+      pendingBadge.style.display = 'none';
+    }
   } else {
     topbarUser.innerHTML = '👤 Not logged in';
     loginBtn.style.display = 'block';
@@ -937,11 +1104,13 @@ function render() {
     pendingBadge.style.display = 'none';
   }
 
+  // admin state
   document.getElementById('admin-locked').style.display = isAdmin ? 'none' : (currentPlayer ? 'none' : 'block');
   document.getElementById('admin-unlocked').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('admin-content').style.display = isAdmin ? 'block' : 'none';
   document.getElementById('my-account').style.display = (currentPlayer && !isAdmin) ? 'block' : 'none';
 
+  // log tab
   const logNotLogged = document.getElementById('log-not-logged');
   const logForm = document.getElementById('log-form');
   const logPlayerForm = document.getElementById('log-player-form');
@@ -994,7 +1163,6 @@ function render() {
     oddsPlayerInfo.style.display = 'flex';
     document.getElementById('odds-player-name').innerHTML = `${getFlag(selectedOddsPlayer)}${selectedOddsPlayer}`;
     document.getElementById('odds-player-elo').textContent = `ELO ${playerElo}`;
-
     const opponents = data.players
       .filter(p => p.name !== selectedOddsPlayer)
       .map(p => {
@@ -1004,7 +1172,6 @@ function render() {
         return { ...p, oppElo, ...odds, h2h };
       })
       .sort((a, b) => a.winProb - b.winProb);
-
     oddsList.innerHTML = opponents.map(op => {
       const difficulty = op.winProb < 40 ? 'hard' : op.winProb <= 60 ? 'medium' : 'easy';
       const barColor = difficulty === 'hard' ? '#ef4444' : difficulty === 'medium' ? '#f59e0b' : '#4ade80';
@@ -1134,7 +1301,6 @@ function render() {
   // general stats
   const gs = document.getElementById('general-stats');
   const confirmedMatches = getConfirmed();
-
   const teamEloHTML = (() => {
     const teams = LANGUAGES.map(l => {
       const lPlayers = data.players.filter(p => p.lang === l.code);
@@ -1208,9 +1374,12 @@ function render() {
       ${teamEloHTML}`;
   }
 
-  // pending
+  // pending + disputed sections in history
   const pendingSection = document.getElementById('pending-section');
   const pendingList = document.getElementById('pending-list');
+  const disputedSection = document.getElementById('disputed-section');
+  const disputedList = document.getElementById('disputed-list');
+
   if (currentPlayer) {
     const pending = getPendingForPlayer(currentPlayer);
     if (pending.length > 0) {
@@ -1230,6 +1399,25 @@ function render() {
     pendingSection.style.display = 'none';
   }
 
+  if (isAdmin) {
+    const disputed = getDisputedMatches();
+    if (disputed.length > 0) {
+      disputedSection.style.display = 'block';
+      disputedList.innerHTML = disputed.map(m => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
+          <span><span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span> <span style="color:#475569;font-size:12px">${m.date}</span><br><span style="color:#ef4444;font-size:11px">⚠️ Disputed by ${m.disputedBy || m.loser}</span></span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn-confirm" onclick="adminResolveDispute(${m.idx}, 'confirm')">✅</button>
+            <button class="btn-reject" onclick="adminResolveDispute(${m.idx}, 'delete')">🗑️</button>
+          </div>
+        </div>`).join('');
+    } else {
+      disputedSection.style.display = 'none';
+    }
+  } else {
+    disputedSection.style.display = 'none';
+  }
+
   // history
   const eloChanges = calculateEloChanges();
   const hl = document.getElementById('history-list');
@@ -1239,7 +1427,9 @@ function render() {
     hl.innerHTML = [...data.matches].reverse().map((m, ri) => {
       const i = data.matches.length - 1 - ri;
       const isPending = m.status === 'pending';
+      const isDisputed = m.status === 'disputed';
       const canEdit = isAdmin || (currentPlayer && (m.winner === currentPlayer || m.loser === currentPlayer));
+      const canDelete = isAdmin || (currentPlayer && m.loggedBy === currentPlayer);
       const isEditing = editingMatch === i;
       const eloChange = eloChanges[i];
       let editSection = '';
@@ -1250,22 +1440,27 @@ function render() {
           <button class="btn-small btn-save" onclick="saveEditMatch(${i})">Save</button>
         </div>`;
       }
-      return `<div class="card ${isPending ? 'pending' : ''}">
+      return `<div class="card ${isPending ? 'pending' : isDisputed ? 'disputed' : ''}">
         <div class="row">
           <span style="font-size:14px">
             ${isPending ? '<span style="color:#f59e0b;font-size:11px;margin-right:4px;">⏳</span>' : ''}
+            ${isDisputed ? '<span style="color:#ef4444;font-size:11px;margin-right:4px;">🚨</span>' : ''}
             <span class="win">${getFlag(m.winner)}${m.winner}</span> beat <span class="loss">${getFlag(m.loser)}${m.loser}</span>
           </span>
           <div style="display:flex;gap:6px;align-items:center">
             <span style="color:#475569;font-size:12px">${m.date}</span>
             ${eloChange ? `<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>` : ''}
             ${isPending && isAdmin ? `<button class="btn-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-reject" onclick="rejectMatch(${i})">❌</button>` : ''}
-            ${canEdit ? `<div class="btn-actions">
+            ${isPending && currentPlayer && m.loser === currentPlayer ? `<button class="btn-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-reject" onclick="rejectMatch(${i})">❌</button>` : ''}
+            ${canEdit && !isPending && !isDisputed ? `<div class="btn-actions">
               <button class="btn-small btn-edit" onclick="startEditMatch(${i})">✏️</button>
-              <button class="btn-small btn-delete" onclick="deleteMatch(${i})">🗑️</button>
+            </div>` : ''}
+            ${canDelete && !isDisputed ? `<div class="btn-actions">
+              <button class="btn-small btn-delete" onclick="${isAdmin ? 'deleteMatch' : 'rejectMatch'}(${i})">🗑️</button>
             </div>` : ''}
           </div>
         </div>
+        ${isDisputed ? `<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy || m.loser} — waiting for admin</div>` : ''}
         ${editSection}
       </div>`;
     }).join('');
@@ -1345,6 +1540,12 @@ window.changePassword = changePassword;
 window.setResult = setResult;
 window.toggleEloInfo = toggleEloInfo;
 window.render = render;
+window.approvalConfirm = approvalConfirm;
+window.approvalDispute = approvalDispute;
+window.closeApprovalModal = closeApprovalModal;
+window.adminResolveDispute = adminResolveDispute;
+window.closeAdminDisputedModal = closeAdminDisputedModal;
+window.showAdminDisputedModal = showAdminDisputedModal;
 
 render();
 </script>
