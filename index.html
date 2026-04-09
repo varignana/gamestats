@@ -7,7 +7,6 @@
 
 <!-- ============================================================
   SECTION 1 — STYLES
-  All visual styling for the app
   1.1 Reset & Base
   1.2 Layout & Cards
   1.3 Buttons
@@ -64,8 +63,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 .btn-danger { width: 100%; padding: 14px; background: transparent; color: #ef4444; border: 2px solid #ef4444; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
 .btn-back { display: flex; align-items: center; gap: 8px; background: #1e293b; color: #94a3b8; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 14px; margin-bottom: 20px; }
 .admin-lock-btn { width:100%; padding:12px; background:#334155; color:#94a3b8; border:none; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px; }
-
-/* Action buttons — dark background with colored border and icon */
+/* Action buttons — dark background with colored border */
 .btn-act { padding: 7px 12px; font-size: 13px; border-radius: 7px; cursor: pointer; font-weight: 700; color: #f1f5f9; display: inline-flex; align-items: center; gap: 5px; background: #0f172a; }
 .btn-act-confirm { border: 2px solid #4ade80; color: #4ade80; }
 .btn-act-dispute { border: 2px solid #f59e0b; color: #f59e0b; }
@@ -75,9 +73,8 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 .pending-badge { background:#f59e0b; color:#0f172a; border-radius:20px; padding:2px 8px; font-size:12px; font-weight:800; cursor:pointer; }
 
 /* 1.4 Match Status Colors */
-.card.provisional { border: 1px solid #38bdf8; background: #1e293b; }
-.card.pending-old  { border: 1px dashed #f59e0b; opacity: 0.7; }
-.card.disputed     { border: 1px dashed #ef4444; opacity: 0.7; }
+.card.provisional { border: 1px solid #38bdf8; }
+.card.disputed    { border: 1px dashed #ef4444; opacity: 0.7; }
 .win  { color: #4ade80; font-weight: 700; }
 .loss { color: #f87171; font-weight: 700; }
 .pct { background: #0f172a; border-radius: 6px; padding: 2px 8px; font-weight: 800; color: #94a3b8; font-size: 12px; }
@@ -191,19 +188,19 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       <span id="sync-text">Connecting...</span>
     </div>
 
-    <!-- TOP BAR — login state + pending badge -->
+    <!-- TOP BAR -->
     <div class="topbar">
       <div class="topbar-user" id="topbar-user">👤 Not logged in</div>
       <div class="topbar-actions">
         <span id="pending-badge" class="pending-badge" style="display:none" onclick="scrollToPending()"></span>
-        <button id="topbar-login-btn" class="btn-small btn-add" style="padding:6px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer;font-weight:700;background:#38bdf8;color:#0f172a;" onclick="showPlayerLogin()">Login</button>
-        <button id="topbar-logout-btn" class="btn-small btn-delete" style="padding:6px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer;font-weight:700;background:#ef4444;color:white;display:none" onclick="playerLogout()">Logout</button>
+        <button id="topbar-login-btn" style="padding:6px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer;font-weight:700;background:#38bdf8;color:#0f172a;" onclick="showPlayerLogin()">Login</button>
+        <button id="topbar-logout-btn" style="padding:6px 12px;font-size:12px;border-radius:6px;border:none;cursor:pointer;font-weight:700;background:#ef4444;color:white;display:none" onclick="playerLogout()">Logout</button>
       </div>
     </div>
 
     <div id="message" class="message info" style="display:none"></div>
 
-    <!-- NAVIGATION TABS -->
+    <!-- NAVIGATION -->
     <div class="nav">
       <button class="active" onclick="switchTab('dashboard', this)">📊 Stats</button>
       <button onclick="switchTab('odds', this)">🎯 Odds</button>
@@ -213,7 +210,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
     </div>
 
     <!-- ============================================================
-      SECTION 2 — TAB: STATS (Leaderboard)
+      SECTION 2 — TAB: STATS
     ============================================================ -->
     <div id="tab-dashboard" class="tab active">
       <div class="lang-filter" id="lang-filter"></div>
@@ -223,7 +220,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <span id="elo-info-arrow">▼</span>
         </div>
         <div class="elo-info-body" id="elo-info-body">
-          The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one. Losing to a weaker player costs you more points.
+          The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one.
           <br><br>
           <strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). New ELO = current ELO + 32 × (result - expected score).
         </div>
@@ -262,7 +259,6 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
           Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
         </div>
-        <!-- Player form: I Won / I Lost -->
         <div id="log-player-form">
           <label>Result</label>
           <div class="result-btns">
@@ -272,7 +268,6 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <label>Opponent</label>
           <select id="opponent"><option value="">Select opponent...</option></select>
         </div>
-        <!-- Admin form: pick winner and loser freely -->
         <div id="log-admin-form" style="display:none">
           <label>🏆 Winner</label>
           <select id="winner"><option value="">Select winner...</option></select>
@@ -285,20 +280,16 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 
     <!-- ============================================================
       SECTION 5 — TAB: HISTORY
-      Shows today by default, navigate with arrows
     ============================================================ -->
     <div id="tab-history" class="tab">
-      <!-- Pending approvals for logged-in player -->
       <div id="pending-section" class="pending-section" style="display:none">
         <div class="pending-title">⏳ Matches waiting for your confirmation</div>
         <div id="pending-list"></div>
       </div>
-      <!-- Disputed matches — admin only -->
       <div id="disputed-section" class="disputed-section" style="display:none">
         <div class="disputed-title">🚨 Disputed matches — admin will resolve</div>
         <div id="disputed-list"></div>
       </div>
-      <!-- Date navigation -->
       <div class="history-nav">
         <button onclick="historyPrevDay()" id="history-prev-btn">◀ Prev</button>
         <span class="history-date-label" id="history-date-label">Today</span>
@@ -308,22 +299,21 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
     </div>
 
     <!-- ============================================================
-      SECTION 6 — TAB: PLAYERS (Admin + My Account)
+      SECTION 6 — TAB: PLAYERS
     ============================================================ -->
     <div id="tab-players" class="tab">
-      <!-- Admin lock button -->
       <div id="admin-locked">
         <button class="admin-lock-btn" onclick="showAdminLogin()">🔒 Admin Login to manage players</button>
       </div>
-      <!-- Admin logged-in bar -->
       <div id="admin-unlocked" style="display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
           <span style="color:#4ade80;font-weight:700;font-size:13px;">🔓 Logged in as admin</span>
           <button onclick="adminLogout()" style="background:#ef4444;color:white;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;">Logout</button>
         </div>
       </div>
-      <!-- Admin content -->
       <div id="admin-content" style="display:none">
+
+        <!-- Add Player -->
         <div class="section-title">Add Player</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
           <label>Name</label>
@@ -331,27 +321,55 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <label>Category</label>
           <select id="newPlayerLang" style="margin-bottom:10px">
             <option value="">No category</option>
-            <option value="en">🇬🇧 English</option>
-            <option value="it">🇮🇹 Italian</option>
-            <option value="fr">🇫🇷 French</option>
-            <option value="de">🇩🇪 German</option>
-            <option value="pt">🇵🇹 Portuguese</option>
-            <option value="l4s">⭐ L4s</option>
-            <option value="mgr">👔 Managers</option>
           </select>
           <label>Initial password</label>
           <input type="password" id="newPlayerPassword" placeholder="Set initial password..." style="margin-bottom:10px">
           <button class="btn" onclick="addPlayer()">Add Player</button>
         </div>
+
+        <!-- Players list -->
         <div class="section-title">Players</div>
         <div id="player-list"></div>
+
         <hr class="divider">
+
+        <!-- ── Categories management ── -->
+        <div class="section-title">🏷️ Categories</div>
+        <div id="category-list"></div>
+
+        <!-- Add new category form -->
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="section-title" style="font-size:14px;margin-bottom:10px">Add Category</div>
+          <label>Label (name)</label>
+          <input id="newCatLabel" placeholder="e.g. Marketing" style="margin-bottom:10px">
+          <label>Badge type</label>
+          <select id="newCatType" onchange="toggleCatTypeInputs()" style="margin-bottom:10px">
+            <option value="emoji">Emoji</option>
+            <option value="flag">Flag (country code)</option>
+          </select>
+          <div id="newCatEmojiDiv">
+            <label>Emoji</label>
+            <input id="newCatEmoji" placeholder="e.g. 🚀" style="margin-bottom:10px">
+          </div>
+          <div id="newCatFlagDiv" style="display:none">
+            <label>Country code (e.g. gb, it, fr, de, pt, es, us)</label>
+            <input id="newCatFlag" placeholder="e.g. es" style="margin-bottom:10px">
+          </div>
+          <button class="btn" onclick="addCategory()">Add Category</button>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Settings -->
         <div class="section-title">⚙️ Settings</div>
         <div class="setting-row">
           <label>Min matches to appear in leaderboard</label>
           <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
         </div>
+
         <hr class="divider">
+
+        <!-- Export / Import -->
         <div class="section-title">📤 Export & Import</div>
         <button class="btn-outline" onclick="exportData()">📤 Export Data</button>
         <label for="importFile" class="btn-outline">📥 Import Data</label>
@@ -359,7 +377,8 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <hr class="divider">
         <button class="btn-danger" onclick="resetData()">🗑️ Reset All Data</button>
       </div>
-      <!-- My Account — for logged-in players -->
+
+      <!-- My Account -->
       <div id="my-account" style="display:none">
         <div class="section-title">👤 My Account</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -376,11 +395,12 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       SECTION 7 — MODALS
       7.1 Admin login
       7.2 Player login
-      7.3 Forced approval on login
-      7.4 Admin disputed matches
+      7.3 Forced approval
+      7.4 Admin disputed
+      7.5 Edit category
     ============================================================ -->
 
-    <!-- 7.1 Admin Login Modal -->
+    <!-- 7.1 Admin Login -->
     <div id="admin-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>🔒 Admin Login</h3>
@@ -393,7 +413,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
-    <!-- 7.2 Player Login Modal -->
+    <!-- 7.2 Player Login -->
     <div id="player-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>👤 Player Login</h3>
@@ -406,7 +426,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
-    <!-- 7.3 Forced Approval Modal — shown on login if pending matches exist -->
+    <!-- 7.3 Forced Approval -->
     <div id="approval-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>⏳ Matches to Confirm</h3>
@@ -416,13 +436,38 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
-    <!-- 7.4 Admin Disputed Modal — shown on admin login if disputes exist -->
+    <!-- 7.4 Admin Disputed -->
     <div id="admin-disputed-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
         <h3>🚨 Disputed Matches</h3>
         <p>These matches have been disputed. Please review and decide.</p>
         <div id="admin-disputed-list"></div>
         <button class="btn" onclick="closeAdminDisputedModal()">Done</button>
+      </div>
+    </div>
+
+    <!-- 7.5 Edit Category Modal -->
+    <div id="edit-cat-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>✏️ Edit Category</h3>
+        <input type="hidden" id="edit-cat-code">
+        <label>Label</label>
+        <input id="edit-cat-label" placeholder="Category name..." style="margin-bottom:10px">
+        <label>Badge type</label>
+        <select id="edit-cat-type" onchange="toggleEditCatInputs()" style="margin-bottom:10px">
+          <option value="emoji">Emoji</option>
+          <option value="flag">Flag (country code)</option>
+        </select>
+        <div id="edit-cat-emoji-div">
+          <label>Emoji</label>
+          <input id="edit-cat-emoji" placeholder="e.g. 🚀" style="margin-bottom:10px">
+        </div>
+        <div id="edit-cat-flag-div" style="display:none">
+          <label>Country code</label>
+          <input id="edit-cat-flag" placeholder="e.g. es" style="margin-bottom:10px">
+        </div>
+        <button class="btn" onclick="saveEditCategory()">Save</button>
+        <button class="btn-danger" onclick="closeEditCategoryModal()">Cancel</button>
       </div>
     </div>
 
@@ -436,30 +481,31 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
     <div id="h2h-content"></div>
   </div>
 
-</div><!-- end container -->
+</div>
 
 <!-- ============================================================
   SECTION 9 — JAVASCRIPT
   9.1  Firebase imports & config
   9.2  Constants & state variables
   9.3  Firebase listeners
-  9.4  Utility functions (ELO, flags, stats)
-  9.5  Auto-approval logic
-  9.6  Admin auth
-  9.7  Player auth & forced approval modal
-  9.8  Match logging
-  9.9  Match actions (confirm, dispute, delete)
-  9.10 Player management
-  9.11 History navigation
-  9.12 Data export/import/reset
-  9.13 Main render function
-  9.14 Window exports
+  9.4  Utility functions
+  9.5  Category management
+  9.6  Auto-approval logic
+  9.7  Admin auth
+  9.8  Player auth & forced approval
+  9.9  Match logging
+  9.10 Match actions
+  9.11 Player management
+  9.12 History navigation
+  9.13 Data export/import/reset
+  9.14 Tab switching & UI helpers
+  9.15 Main render function
+  9.16 Window exports
 ============================================================ -->
 <script type="module">
 
 /* ----------------------------------------------------------
   9.1 Firebase imports & config
-  Replace YOUR_... values with your Firebase credentials
 ---------------------------------------------------------- */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -475,15 +521,16 @@ const firebaseConfig = {
   measurementId: "G-0J4XXBKZ4B"
 };
 
-const app       = initializeApp(firebaseConfig);
-const db        = getFirestore(app);
-const analytics = getAnalytics(app);
+const app        = initializeApp(firebaseConfig);
+const db         = getFirestore(app);
+const analytics  = getAnalytics(app);
 
 // Firebase document references
-const dataRef       = doc(db, 'gamestats', 'data');
-const settingsRef   = doc(db, 'gamestats', 'settings');
-const adminRef      = doc(db, 'admin', 'credentials');
-const playersAuthRef= doc(db, 'admin', 'playerPasswords');
+const dataRef        = doc(db, 'gamestats', 'data');
+const settingsRef    = doc(db, 'gamestats', 'settings');
+const categoriesRef  = doc(db, 'gamestats', 'categories');  // NEW — stores categories
+const adminRef       = doc(db, 'admin', 'credentials');
+const playersAuthRef = doc(db, 'admin', 'playerPasswords');
 
 logEvent(analytics, 'app_open');
 
@@ -491,50 +538,59 @@ logEvent(analytics, 'app_open');
   9.2 Constants & state variables
 ---------------------------------------------------------- */
 
-// All player categories — language teams + special groups
-const CATEGORIES = [
-  { code: 'en',  label: 'English',   icon: null,  country: 'gb'  },
-  { code: 'it',  label: 'Italian',   icon: null,  country: 'it'  },
-  { code: 'fr',  label: 'French',    icon: null,  country: 'fr'  },
-  { code: 'de',  label: 'German',    icon: null,  country: 'de'  },
-  { code: 'pt',  label: 'Portuguese',icon: null,  country: 'pt'  },
-  { code: 'l4s', label: 'L4s',       icon: '⭐',  country: null  },
-  { code: 'mgr', label: 'Managers',  icon: '👔',  country: null  },
+// Default categories — used only on first load if Firebase has none
+const DEFAULT_CATEGORIES = [
+  { code: 'en',  label: 'English',    type: 'flag',  value: 'gb'  },
+  { code: 'it',  label: 'Italian',    type: 'flag',  value: 'it'  },
+  { code: 'fr',  label: 'French',     type: 'flag',  value: 'fr'  },
+  { code: 'de',  label: 'German',     type: 'flag',  value: 'de'  },
+  { code: 'pt',  label: 'Portuguese', type: 'flag',  value: 'pt'  },
+  { code: 'l4s', label: 'L4s',        type: 'emoji', value: '⭐'  },
+  { code: 'mgr', label: 'Managers',   type: 'emoji', value: '👔'  },
 ];
 
 const ELO_K    = 32;
 const ELO_BASE = 1000;
 
 // App state
-let data           = { players: [], matches: [] };
-let settings       = { minMatches: 0 };
-let playerPasswords= {};
-let editingMatch   = null;
-let editingPlayer  = null;
-let selectedPlayer = null;
-let activeLang     = 'all';
-let currentPlayer  = null;
-let isAdmin        = false;
-let matchResult    = 'won';
-let eloInfoOpen    = false;
-let settingsLoaded = false;
-
-// History navigation — offset from today (0 = today, -1 = yesterday, etc)
-let historyDayOffset = 0;
+let data            = { players: [], matches: [] };
+let settings        = { minMatches: 0 };
+let categories      = [...DEFAULT_CATEGORIES]; // live categories from Firebase
+let playerPasswords = {};
+let editingMatch    = null;
+let editingPlayer   = null;
+let selectedPlayer  = null;
+let activeLang      = 'all';
+let currentPlayer   = null;
+let isAdmin         = false;
+let matchResult     = 'won';
+let eloInfoOpen     = false;
+let historyDayOffset= 0;
 
 /* ----------------------------------------------------------
   9.3 Firebase listeners
-  Listen for real-time changes from Firebase
+  Listen for real-time changes and update state + re-render
 ---------------------------------------------------------- */
 
-// Settings listener — loads first so unranked filter applies on first render
+// Settings listener — loads first so unranked filter applies immediately
 onSnapshot(settingsRef, (snap) => {
   if (snap.exists()) {
     settings = snap.data();
     const el = document.getElementById('minMatchesSetting');
     if (el) el.value = settings.minMatches || 0;
   }
-  settingsLoaded = true;
+  render();
+});
+
+// Categories listener — loads dynamic categories from Firebase
+onSnapshot(categoriesRef, (snap) => {
+  if (snap.exists() && snap.data().list && snap.data().list.length > 0) {
+    categories = snap.data().list;
+  } else {
+    // First time — save defaults to Firebase
+    categories = [...DEFAULT_CATEGORIES];
+    setDoc(categoriesRef, { list: categories });
+  }
   render();
 });
 
@@ -547,7 +603,6 @@ onSnapshot(dataRef, (snap) => {
   } else {
     data = { players: [], matches: [] };
   }
-  // Auto-approve any provisional matches from previous days
   autoApprovePreviousDays();
   setSyncStatus('live');
   render();
@@ -560,6 +615,7 @@ onSnapshot(playersAuthRef, (snap) => {
 
 /* ----------------------------------------------------------
   9.4 Utility functions
+  General helpers used throughout the app
 ---------------------------------------------------------- */
 
 function setSyncStatus(state) {
@@ -567,15 +623,15 @@ function setSyncStatus(state) {
   const text = document.getElementById('sync-text');
   if (state === 'live')     { dot.className = 'sync-dot'; text.textContent = 'Live — data shared with everyone'; }
   else if (state === 'syncing') { dot.className = 'sync-dot syncing'; text.textContent = 'Saving...'; }
-  else if (state === 'error')   { dot.className = 'sync-dot error'; text.textContent = 'Connection error'; }
+  else if (state === 'error')   { dot.className = 'sync-dot error';   text.textContent = 'Connection error'; }
   else { dot.className = 'sync-dot syncing'; text.textContent = 'Connecting...'; }
 }
 
 function showMessage(msg, type = 'info') {
   const el = document.getElementById('message');
-  el.textContent  = msg;
-  el.className    = 'message ' + type;
-  el.style.display= 'block';
+  el.textContent   = msg;
+  el.className     = 'message ' + type;
+  el.style.display = 'block';
   clearTimeout(window._msgTimer);
   window._msgTimer = setTimeout(() => el.style.display = 'none', 3000);
 }
@@ -597,22 +653,29 @@ async function saveSettings() {
   render();
 }
 
-// Get category object for a player
+// Get category object by code
 function getCategoryObj(code) {
-  return CATEGORIES.find(c => c.code === code) || null;
+  return categories.find(c => c.code === code) || null;
 }
 
-// Get flag image or emoji icon for a player
+// Get the badge HTML for a category code
 function getCategoryBadge(code) {
   if (!code) return '';
   const cat = getCategoryObj(code);
   if (!cat) return '';
-  if (cat.icon) {
-    // Special group — use emoji icon
-    return `<span style="font-size:16px;margin-right:4px;">${cat.icon}</span>`;
+  if (cat.type === 'emoji') {
+    return `<span style="font-size:16px;margin-right:4px;">${cat.value}</span>`;
   }
-  // Language team — use flag image
-  return `<img src="https://flagcdn.com/20x15/${cat.country}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${cat.label}">`;
+  // Flag
+  return `<img src="https://flagcdn.com/20x15/${cat.value}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${cat.label}">`;
+}
+
+// Get small badge for filter buttons
+function getCategoryBadgeSmall(cat) {
+  if (cat.type === 'emoji') {
+    return `<span style="font-size:14px;margin-right:4px">${cat.value}</span>`;
+  }
+  return `<img src="https://flagcdn.com/20x15/${cat.value}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">`;
 }
 
 function getPlayerObj(name) { return data.players.find(p => p.name === name); }
@@ -623,12 +686,12 @@ function getPlayerBadge(name) {
   return getCategoryBadge(p.lang);
 }
 
-// ELO: returns confirmed matches only (provisional also counts in stats)
+// Only count confirmed and provisional matches in stats
 function getConfirmed() {
   return data.matches.filter(m => m.status === 'confirmed' || m.status === 'provisional' || !m.status);
 }
 
-// Calculate current ELO for all players by replaying all confirmed/provisional matches
+// Calculate ELO for all players
 function calculateAllElos() {
   const ratings = {};
   data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
@@ -654,38 +717,36 @@ function calculateEloChanges() {
     const rL = ratings[m.loser]  || ELO_BASE;
     const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
     const changeW   = Math.round(ELO_K * (1 - expectedW));
-    const changeL   = -changeW;
     ratings[m.winner] = rW + changeW;
-    ratings[m.loser]  = rL + changeL;
-    changes.push({ winner: changeW, loser: changeL });
+    ratings[m.loser]  = rL - changeW;
+    changes.push({ winner: changeW, loser: -changeW });
   });
   return changes;
 }
 
-// Calculate win probability and ELO points at stake for odds tab
+// Win probability and ELO points at stake
 function getEloOdds(playerElo, opponentElo) {
-  const expectedW = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
-  const winProb   = Math.round(expectedW * 100);
-  const changeWin = Math.round(ELO_K * (1 - expectedW));
-  const changeLoss= -changeWin;
-  return { winProb, lossProb: 100 - winProb, changeWin, changeLoss };
+  const expectedW  = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
+  const winProb    = Math.round(expectedW * 100);
+  const changeWin  = Math.round(ELO_K * (1 - expectedW));
+  return { winProb, lossProb: 100 - winProb, changeWin, changeLoss: -changeWin };
 }
 
 function getStats(name) {
   const confirmed = getConfirmed();
-  const wins   = confirmed.filter(m => m.winner === name).length;
-  const losses = confirmed.filter(m => m.loser  === name).length;
-  const total  = wins + losses;
-  const pct    = total === 0 ? 0 : Math.round((wins / total) * 100);
+  const wins      = confirmed.filter(m => m.winner === name).length;
+  const losses    = confirmed.filter(m => m.loser  === name).length;
+  const total     = wins + losses;
+  const pct       = total === 0 ? 0 : Math.round((wins / total) * 100);
   return { wins, losses, total, pct };
 }
 
 function getH2H(p1, p2) {
   const confirmed = getConfirmed();
-  const p1wins = confirmed.filter(m => m.winner === p1 && m.loser === p2).length;
-  const p2wins = confirmed.filter(m => m.winner === p2 && m.loser === p1).length;
-  const total  = p1wins + p2wins;
-  const pct    = total === 0 ? 0 : Math.round((p1wins / total) * 100);
+  const p1wins    = confirmed.filter(m => m.winner === p1 && m.loser === p2).length;
+  const p2wins    = confirmed.filter(m => m.winner === p2 && m.loser === p1).length;
+  const total     = p1wins + p2wins;
+  const pct       = total === 0 ? 0 : Math.round((p1wins / total) * 100);
   return { p1wins, p2wins, total, pct };
 }
 
@@ -699,7 +760,6 @@ function getDisputedMatches() {
     .filter(m => m.status === 'disputed');
 }
 
-// Format a date string for history navigation
 function getDateForOffset(offset) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
@@ -713,9 +773,115 @@ function getDateLabel(offset) {
 }
 
 /* ----------------------------------------------------------
-  9.5 Auto-approval logic
-  Runs on every data load — confirms provisional matches
-  that are from a previous day (before today)
+  9.5 Category management
+  Create, edit and delete categories dynamically
+---------------------------------------------------------- */
+
+// Save categories to Firebase
+async function saveCategories() {
+  await setDoc(categoriesRef, { list: categories });
+}
+
+// Generate a unique code from label
+function generateCode(label) {
+  const base = label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').substring(0, 10);
+  // Make sure it's unique
+  let code = base;
+  let i = 2;
+  while (categories.find(c => c.code === code)) { code = base + i; i++; }
+  return code;
+}
+
+// Toggle add category form inputs based on type
+function toggleCatTypeInputs() {
+  const type = document.getElementById('newCatType').value;
+  document.getElementById('newCatEmojiDiv').style.display = type === 'emoji' ? 'block' : 'none';
+  document.getElementById('newCatFlagDiv').style.display  = type === 'flag'  ? 'block' : 'none';
+}
+
+// Toggle edit category modal inputs based on type
+function toggleEditCatInputs() {
+  const type = document.getElementById('edit-cat-type').value;
+  document.getElementById('edit-cat-emoji-div').style.display = type === 'emoji' ? 'block' : 'none';
+  document.getElementById('edit-cat-flag-div').style.display  = type === 'flag'  ? 'block' : 'none';
+}
+
+// Add new category
+async function addCategory() {
+  const label = document.getElementById('newCatLabel').value.trim();
+  const type  = document.getElementById('newCatType').value;
+  const emoji = document.getElementById('newCatEmoji').value.trim();
+  const flag  = document.getElementById('newCatFlag').value.trim().toLowerCase();
+
+  if (!label) { showMessage('Please enter a category name!', 'error'); return; }
+  if (type === 'emoji' && !emoji) { showMessage('Please enter an emoji!', 'error'); return; }
+  if (type === 'flag'  && !flag)  { showMessage('Please enter a country code!', 'error'); return; }
+
+  const code  = generateCode(label);
+  const value = type === 'emoji' ? emoji : flag;
+
+  categories.push({ code, label, type, value });
+  await saveCategories();
+
+  document.getElementById('newCatLabel').value = '';
+  document.getElementById('newCatEmoji').value = '';
+  document.getElementById('newCatFlag').value  = '';
+  showMessage(label + ' category added!', 'success');
+}
+
+// Open edit modal for a category
+function editCategory(code) {
+  const cat = getCategoryObj(code);
+  if (!cat) return;
+  document.getElementById('edit-cat-code').value  = code;
+  document.getElementById('edit-cat-label').value = cat.label;
+  document.getElementById('edit-cat-type').value  = cat.type;
+  document.getElementById('edit-cat-emoji').value = cat.type === 'emoji' ? cat.value : '';
+  document.getElementById('edit-cat-flag').value  = cat.type === 'flag'  ? cat.value : '';
+  toggleEditCatInputs();
+  document.getElementById('edit-cat-overlay').style.display = 'flex';
+}
+
+function closeEditCategoryModal() {
+  document.getElementById('edit-cat-overlay').style.display = 'none';
+}
+
+// Save edited category
+async function saveEditCategory() {
+  const code  = document.getElementById('edit-cat-code').value;
+  const label = document.getElementById('edit-cat-label').value.trim();
+  const type  = document.getElementById('edit-cat-type').value;
+  const emoji = document.getElementById('edit-cat-emoji').value.trim();
+  const flag  = document.getElementById('edit-cat-flag').value.trim().toLowerCase();
+
+  if (!label) { showMessage('Please enter a category name!', 'error'); return; }
+  if (type === 'emoji' && !emoji) { showMessage('Please enter an emoji!', 'error'); return; }
+  if (type === 'flag'  && !flag)  { showMessage('Please enter a country code!', 'error'); return; }
+
+  const value = type === 'emoji' ? emoji : flag;
+  categories = categories.map(c => c.code === code ? { ...c, label, type, value } : c);
+  await saveCategories();
+  closeEditCategoryModal();
+  showMessage('Category updated!', 'success');
+}
+
+// Delete category — only if no players are assigned
+async function deleteCategory(code) {
+  const playersWithCat = data.players.filter(p => p.lang === code);
+  if (playersWithCat.length > 0) {
+    showMessage(`Cannot delete — ${playersWithCat.length} player(s) still assigned to this category!`, 'error');
+    return;
+  }
+  if (!confirm('Delete this category?')) return;
+  categories = categories.filter(c => c.code !== code);
+  await saveCategories();
+  showMessage('Category deleted!', 'success');
+}
+
+/* ----------------------------------------------------------
+  9.6 Auto-approval logic
+  On every data load — auto-confirm provisional matches
+  from previous days
 ---------------------------------------------------------- */
 async function autoApprovePreviousDays() {
   const today   = new Date().toLocaleDateString();
@@ -726,13 +892,11 @@ async function autoApprovePreviousDays() {
       changed  = true;
     }
   });
-  if (changed) {
-    await save();
-  }
+  if (changed) await save();
 }
 
 /* ----------------------------------------------------------
-  9.6 Admin auth
+  9.7 Admin auth
 ---------------------------------------------------------- */
 function showAdminLogin() {
   document.getElementById('admin-overlay').style.display = 'flex';
@@ -756,7 +920,6 @@ async function attemptAdminLogin() {
         hideAdminLogin();
         showMessage('Welcome admin! 👋', 'success');
         logEvent(analytics, 'admin_login');
-        // Show disputed matches popup if any exist
         if (getDisputedMatches().length > 0) showAdminDisputedModal();
         render();
       } else {
@@ -811,7 +974,7 @@ async function adminResolveDispute(index, action) {
 }
 
 /* ----------------------------------------------------------
-  9.7 Player auth & forced approval modal
+  9.8 Player auth & forced approval modal
 ---------------------------------------------------------- */
 function showPlayerLogin() {
   const select = document.getElementById('player-login-select');
@@ -835,7 +998,6 @@ async function attemptPlayerLogin() {
     sessionStorage.setItem('currentPlayer', name);
     hidePlayerLogin();
     logEvent(analytics, 'player_login', { player_name: name });
-    // Show forced approval if pending matches exist
     const pending = getPendingForPlayer(name);
     if (pending.length > 0) {
       showApprovalModal(name);
@@ -856,7 +1018,6 @@ function playerLogout() {
   showMessage('Logged out!', 'info');
 }
 
-// Forced approval modal — player must review before continuing
 function showApprovalModal(playerName) {
   const pending = getPendingForPlayer(playerName);
   if (pending.length === 0) return;
@@ -874,9 +1035,8 @@ function showApprovalModal(playerName) {
   document.getElementById('approval-overlay').style.display  = 'flex';
 }
 function checkApprovalDone() {
-  if (getPendingForPlayer(currentPlayer).length === 0) {
+  if (getPendingForPlayer(currentPlayer).length === 0)
     document.getElementById('approval-done-btn').style.display = 'block';
-  }
 }
 async function approvalConfirm(index) {
   data.matches[index].status = 'confirmed';
@@ -901,7 +1061,6 @@ function closeApprovalModal() {
   document.getElementById('approval-overlay').style.display = 'none';
   showMessage('Welcome ' + currentPlayer + '! 👋', 'success');
 }
-
 function scrollToPending() {
   const historyBtn = document.querySelectorAll('.nav button')[3];
   switchTab('history', historyBtn);
@@ -912,69 +1071,42 @@ function scrollToPending() {
 }
 
 /* ----------------------------------------------------------
-  9.8 Match logging
-  Rules:
-  - Player logs LOSS → status = 'confirmed' immediately
-  - Player logs WIN  → status = 'provisional' (counts in stats, loser can dispute)
-  - Admin logs any   → status = 'confirmed' immediately
-  - Max 3 provisional matches between same players per day
+  9.9 Match logging
+  - Player logs LOSS  → confirmed immediately
+  - Player logs WIN   → provisional (counts, loser can dispute)
+  - Admin logs any    → confirmed immediately
+  - Max 3 provisional per pair per day
 ---------------------------------------------------------- */
 async function logMatch() {
   let winner, loser, loggedAsLoss = false;
-
   if (isAdmin) {
     winner = document.getElementById('winner').value;
     loser  = document.getElementById('loser').value;
-    if (!winner || !loser || winner === loser) {
-      showMessage('Pick two different players!', 'error'); return;
-    }
+    if (!winner || !loser || winner === loser) { showMessage('Pick two different players!', 'error'); return; }
   } else {
     const opponent = document.getElementById('opponent').value;
     if (!opponent) { showMessage('Pick an opponent!', 'error'); return; }
     if (matchResult === 'won') {
-      winner = currentPlayer;
-      loser  = opponent;
+      winner = currentPlayer; loser = opponent;
     } else {
-      // Player is logging their own loss — auto-confirmed
-      winner      = opponent;
-      loser       = currentPlayer;
-      loggedAsLoss= true;
+      winner = opponent; loser = currentPlayer; loggedAsLoss = true;
     }
   }
 
-  const today = new Date().toLocaleDateString();
-
-  // Check max 3 provisional matches between same pair today
+  const today      = new Date().toLocaleDateString();
   const duplicates = data.matches.filter(m =>
     m.status === 'provisional' &&
     ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
     m.date === today
   );
-  if (duplicates.length >= 3) {
-    showMessage('Maximum 3 pending matches between same players per day!', 'error'); return;
-  }
+  if (duplicates.length >= 3) { showMessage('Maximum 3 pending matches between same players per day!', 'error'); return; }
 
-  // Determine status
-  let status;
-  if (isAdmin)      status = 'confirmed';
-  else if (loggedAsLoss) status = 'confirmed';   // loss logged = auto confirmed
-  else              status = 'provisional';       // win logged = counts but loser can dispute
-
-  data.matches.push({
-    winner,
-    loser,
-    date:     today,
-    loggedBy: currentPlayer || 'admin',
-    status
-  });
+  const status = isAdmin ? 'confirmed' : (loggedAsLoss ? 'confirmed' : 'provisional');
+  data.matches.push({ winner, loser, date: today, loggedBy: currentPlayer || 'admin', status });
   await save();
   logEvent(analytics, 'match_logged', { status, logged_by: currentPlayer || 'admin' });
 
-  // Reset selectors
-  ['opponent','winner','loser'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  ['opponent','winner','loser'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
   if (status === 'provisional') {
     showMessage('Match logged! ✅⏳ Counts now — ' + loser + ' can confirm or dispute', 'success');
@@ -984,7 +1116,7 @@ async function logMatch() {
 }
 
 /* ----------------------------------------------------------
-  9.9 Match actions — confirm, dispute, delete
+  9.10 Match actions
 ---------------------------------------------------------- */
 async function confirmMatch(index) {
   data.matches[index].status = 'confirmed';
@@ -995,7 +1127,6 @@ async function confirmMatch(index) {
 
 async function rejectMatch(index) {
   const m = data.matches[index];
-  // Opponent disputing → mark as disputed, send to admin
   if (currentPlayer && m.loggedBy !== currentPlayer && m.loser === currentPlayer) {
     if (!confirm('Dispute this match? It will be sent to admin for review.')) return;
     data.matches[index].status     = 'disputed';
@@ -1003,7 +1134,6 @@ async function rejectMatch(index) {
     await save();
     showMessage('Match disputed — admin will review! 🚨', 'info');
   } else {
-    // Creator or admin deleting → delete
     if (!confirm('Delete this match?')) return;
     data.matches.splice(index, 1);
     await save();
@@ -1026,9 +1156,7 @@ function startEditMatch(index) {
 async function saveEditMatch(index) {
   const newWinner = document.getElementById('edit-winner-' + index).value;
   const newLoser  = document.getElementById('edit-loser-'  + index).value;
-  if (!newWinner || !newLoser || newWinner === newLoser) {
-    showMessage('Pick two different players!', 'error'); return;
-  }
+  if (!newWinner || !newLoser || newWinner === newLoser) { showMessage('Pick two different players!', 'error'); return; }
   data.matches[index].winner = newWinner;
   data.matches[index].loser  = newLoser;
   await save();
@@ -1037,7 +1165,7 @@ async function saveEditMatch(index) {
 }
 
 function openH2H(p1, p2) {
-  selectedPlayer = null;
+  selectedPlayer   = null;
   const h          = getH2H(p1, p2);
   const eloRatings = calculateAllElos();
   logEvent(analytics, 'h2h_viewed', { player1: p1, player2: p2 });
@@ -1090,7 +1218,7 @@ function closeH2H() {
 }
 
 /* ----------------------------------------------------------
-  9.10 Player management
+  9.11 Player management
 ---------------------------------------------------------- */
 async function addPlayer() {
   const name     = document.getElementById('newPlayer').value.trim();
@@ -1105,9 +1233,9 @@ async function addPlayer() {
   playerPasswords[name] = password;
   await save();
   await setDoc(playersAuthRef, playerPasswords);
-  document.getElementById('newPlayer').value        = '';
-  document.getElementById('newPlayerLang').value    = '';
-  document.getElementById('newPlayerPassword').value= '';
+  document.getElementById('newPlayer').value         = '';
+  document.getElementById('newPlayerLang').value     = '';
+  document.getElementById('newPlayerPassword').value = '';
   logEvent(analytics, 'player_added');
   showMessage(name + ' added!', 'success');
 }
@@ -1132,12 +1260,12 @@ function startEditPlayer(name) {
 }
 
 async function saveEditPlayer(oldName) {
-  const input     = document.getElementById('edit-player-' + oldName);
-  const langSelect= document.getElementById('edit-lang-'   + oldName);
-  const passInput = document.getElementById('edit-pass-'   + oldName);
-  const newName   = input.value.trim();
-  const newLang   = langSelect.value;
-  const newPass   = passInput.value;
+  const input      = document.getElementById('edit-player-' + oldName);
+  const langSelect = document.getElementById('edit-lang-'   + oldName);
+  const passInput  = document.getElementById('edit-pass-'   + oldName);
+  const newName    = input.value.trim();
+  const newLang    = langSelect.value;
+  const newPass    = passInput.value;
   if (!newName) { showMessage('Name cannot be empty!', 'error'); return; }
   if (newName.toLowerCase() !== oldName.toLowerCase() &&
       data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
@@ -1149,10 +1277,7 @@ async function saveEditPlayer(oldName) {
     winner: m.winner === oldName ? newName : m.winner,
     loser:  m.loser  === oldName ? newName : m.loser
   }));
-  if (newName !== oldName) {
-    playerPasswords[newName] = playerPasswords[oldName];
-    delete playerPasswords[oldName];
-  }
+  if (newName !== oldName) { playerPasswords[newName] = playerPasswords[oldName]; delete playerPasswords[oldName]; }
   if (newPass) { playerPasswords[newName || oldName] = newPass; }
   await save();
   await setDoc(playersAuthRef, playerPasswords);
@@ -1167,28 +1292,19 @@ async function changePassword() {
   if (np !== cp) { showMessage('Passwords do not match!', 'error'); return; }
   playerPasswords[currentPlayer] = np;
   await setDoc(playersAuthRef, playerPasswords);
-  document.getElementById('new-password').value    = '';
-  document.getElementById('confirm-password').value= '';
+  document.getElementById('new-password').value     = '';
+  document.getElementById('confirm-password').value = '';
   showMessage('Password changed!', 'success');
 }
 
 /* ----------------------------------------------------------
-  9.11 History navigation
-  Navigate day by day using offset from today
+  9.12 History navigation
 ---------------------------------------------------------- */
-function historyPrevDay() {
-  historyDayOffset--;
-  render();
-}
-function historyNextDay() {
-  if (historyDayOffset < 0) {
-    historyDayOffset++;
-    render();
-  }
-}
+function historyPrevDay() { historyDayOffset--; render(); }
+function historyNextDay() { if (historyDayOffset < 0) { historyDayOffset++; render(); } }
 
 /* ----------------------------------------------------------
-  9.12 Data export / import / reset
+  9.13 Data export / import / reset
 ---------------------------------------------------------- */
 function exportData() {
   const json = JSON.stringify(data, null, 2);
@@ -1232,29 +1348,25 @@ async function resetData() {
 }
 
 /* ----------------------------------------------------------
-  9.13 Tab switching
+  9.14 Tab switching & UI helpers
 ---------------------------------------------------------- */
 function switchTab(tab, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   btn.classList.add('active');
-  editingMatch  = null;
-  editingPlayer = null;
+  editingMatch = null; editingPlayer = null;
   logEvent(analytics, 'tab_view', { tab_name: tab });
   if (tab === 'players') {
-    setTimeout(() => {
-      const el = document.getElementById('minMatchesSetting');
-      if (el) el.value = settings.minMatches || 0;
-    }, 50);
+    setTimeout(() => { const el = document.getElementById('minMatchesSetting'); if (el) el.value = settings.minMatches || 0; }, 50);
   }
   render();
 }
 
 function toggleEloInfo() {
   eloInfoOpen = !eloInfoOpen;
-  document.getElementById('elo-info-body').className  = 'elo-info-body' + (eloInfoOpen ? ' open' : '');
-  document.getElementById('elo-info-arrow').textContent= eloInfoOpen ? '▲' : '▼';
+  document.getElementById('elo-info-body').className   = 'elo-info-body' + (eloInfoOpen ? ' open' : '');
+  document.getElementById('elo-info-arrow').textContent = eloInfoOpen ? '▲' : '▼';
 }
 
 function setResult(result) {
@@ -1267,24 +1379,19 @@ function setResult(result) {
   }
 }
 
-function togglePlayer(name) {
-  selectedPlayer = selectedPlayer === name ? null : name;
-  render();
-}
+function togglePlayer(name) { selectedPlayer = selectedPlayer === name ? null : name; render(); }
 
 function setLangFilter(lang) {
-  activeLang = lang;
-  selectedPlayer = null;
+  activeLang = lang; selectedPlayer = null;
   logEvent(analytics, 'language_filter', { language: lang });
   render();
 }
 
 /* ----------------------------------------------------------
-  9.14 Main render function
+  9.15 Main render function
   Rebuilds all visible UI from current state
 ---------------------------------------------------------- */
 function render() {
-  // Restore session state
   if (sessionStorage.getItem('isAdmin') === 'true') isAdmin = true;
   if (sessionStorage.getItem('currentPlayer')) currentPlayer = sessionStorage.getItem('currentPlayer');
 
@@ -1293,43 +1400,43 @@ function render() {
   const minElo     = Math.min(...Object.values(eloRatings), ELO_BASE);
 
   /* --- Topbar --- */
-  const topbarUser  = document.getElementById('topbar-user');
-  const loginBtn    = document.getElementById('topbar-login-btn');
-  const logoutBtn   = document.getElementById('topbar-logout-btn');
-  const pendingBadge= document.getElementById('pending-badge');
+  const topbarUser   = document.getElementById('topbar-user');
+  const loginBtn     = document.getElementById('topbar-login-btn');
+  const logoutBtn    = document.getElementById('topbar-logout-btn');
+  const pendingBadge = document.getElementById('pending-badge');
 
   if (currentPlayer) {
-    topbarUser.innerHTML = `${getPlayerBadge(currentPlayer)}<span>${currentPlayer}</span>`;
-    loginBtn.style.display = 'none';
-    logoutBtn.style.display= 'block';
+    topbarUser.innerHTML    = `${getPlayerBadge(currentPlayer)}<span>${currentPlayer}</span>`;
+    loginBtn.style.display  = 'none';
+    logoutBtn.style.display = 'block';
     const pending = getPendingForPlayer(currentPlayer);
     if (pending.length > 0) {
-      pendingBadge.style.display  = 'inline-block';
-      pendingBadge.textContent    = `⏳ ${pending.length} pending`;
+      pendingBadge.style.display    = 'inline-block';
+      pendingBadge.textContent      = `⏳ ${pending.length} pending`;
       pendingBadge.style.background = '#f59e0b';
-      pendingBadge.style.color    = '#0f172a';
-      pendingBadge.onclick        = scrollToPending;
+      pendingBadge.style.color      = '#0f172a';
+      pendingBadge.onclick          = scrollToPending;
     } else {
       pendingBadge.style.display = 'none';
     }
   } else if (isAdmin) {
-    topbarUser.innerHTML   = '🔒 Admin';
-    loginBtn.style.display = 'none';
-    logoutBtn.style.display= 'none';
+    topbarUser.innerHTML    = '🔒 Admin';
+    loginBtn.style.display  = 'none';
+    logoutBtn.style.display = 'none';
     const disputed = getDisputedMatches();
     if (disputed.length > 0) {
-      pendingBadge.style.display  = 'inline-block';
-      pendingBadge.textContent    = `🚨 ${disputed.length} disputed`;
+      pendingBadge.style.display    = 'inline-block';
+      pendingBadge.textContent      = `🚨 ${disputed.length} disputed`;
       pendingBadge.style.background = '#ef4444';
-      pendingBadge.style.color    = 'white';
-      pendingBadge.onclick        = showAdminDisputedModal;
+      pendingBadge.style.color      = 'white';
+      pendingBadge.onclick          = showAdminDisputedModal;
     } else {
       pendingBadge.style.display = 'none';
     }
   } else {
-    topbarUser.innerHTML   = '👤 Not logged in';
-    loginBtn.style.display = 'block';
-    logoutBtn.style.display= 'none';
+    topbarUser.innerHTML    = '👤 Not logged in';
+    loginBtn.style.display  = 'block';
+    logoutBtn.style.display = 'none';
     pendingBadge.style.display = 'none';
   }
 
@@ -1339,28 +1446,57 @@ function render() {
   document.getElementById('admin-content').style.display  = isAdmin ? 'block' : 'none';
   document.getElementById('my-account').style.display     = (currentPlayer && !isAdmin) ? 'block' : 'none';
 
+  /* --- Category dropdown in Add Player form --- */
+  const newPlayerLangSel = document.getElementById('newPlayerLang');
+  if (newPlayerLangSel) {
+    newPlayerLangSel.innerHTML = '<option value="">No category</option>' +
+      categories.map(c => `<option value="${c.code}">${c.type === 'emoji' ? c.value : '🏳️'} ${c.label}</option>`).join('');
+  }
+
+  /* --- Category list in admin panel --- */
+  const catList = document.getElementById('category-list');
+  if (catList) {
+    if (categories.length === 0) {
+      catList.innerHTML = '<div class="empty" style="padding:20px">No categories yet.</div>';
+    } else {
+      catList.innerHTML = categories.map(c => {
+        const badge         = getCategoryBadge(c.code);
+        const playersInCat  = data.players.filter(p => p.lang === c.code).length;
+        const canDelete     = playersInCat === 0;
+        return `<div class="card">
+          <div class="row">
+            <div style="display:flex;align-items:center;gap:8px">
+              ${badge}
+              <span style="font-weight:700">${c.label}</span>
+              <span style="color:#64748b;font-size:12px">${playersInCat} player${playersInCat !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="btn-actions">
+              <button class="btn-act btn-act-edit" onclick="editCategory('${c.code}')">✏️ Edit</button>
+              <button class="btn-act btn-act-delete" onclick="deleteCategory('${c.code}')" ${!canDelete ? 'style="opacity:0.3;cursor:not-allowed"' : ''} ${!canDelete ? 'disabled' : ''}>🗑️</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+  }
+
   /* --- Log tab --- */
   const logNotLogged  = document.getElementById('log-not-logged');
   const logForm       = document.getElementById('log-form');
   const logPlayerForm = document.getElementById('log-player-form');
   const logAdminForm  = document.getElementById('log-admin-form');
-
   if (!currentPlayer && !isAdmin) {
-    logNotLogged.style.display = 'block';
-    logForm.style.display      = 'none';
+    logNotLogged.style.display = 'block'; logForm.style.display = 'none';
   } else {
-    logNotLogged.style.display = 'none';
-    logForm.style.display      = 'block';
+    logNotLogged.style.display = 'none'; logForm.style.display = 'block';
     document.getElementById('log-as-name').textContent = isAdmin ? 'Admin (can log any match)' : currentPlayer;
     if (isAdmin) {
-      logPlayerForm.style.display = 'none';
-      logAdminForm.style.display  = 'block';
+      logPlayerForm.style.display = 'none'; logAdminForm.style.display = 'block';
       const opts = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
       document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + opts;
       document.getElementById('loser').innerHTML  = '<option value="">Select loser...</option>'  + opts;
     } else {
-      logPlayerForm.style.display = 'block';
-      logAdminForm.style.display  = 'none';
+      logPlayerForm.style.display = 'block'; logAdminForm.style.display = 'none';
       const opts = data.players.filter(p => p.name !== currentPlayer)
         .map(p => `<option value="${p.name}">${p.name}</option>`).join('');
       document.getElementById('opponent').innerHTML = '<option value="">Select opponent...</option>' + opts;
@@ -1371,13 +1507,12 @@ function render() {
   const oddsSelect           = document.getElementById('odds-player-select');
   const currentOddsSelection = oddsSelect.value;
   oddsSelect.innerHTML = '<option value="">Select player...</option>' +
-    [...data.players].sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE))
-      .map(p => `<option value="${p.name}" ${p.name === currentOddsSelection ? 'selected' : ''}>${p.name} (ELO ${eloRatings[p.name] || ELO_BASE})</option>`).join('');
+    [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE))
+      .map(p => `<option value="${p.name}" ${p.name === currentOddsSelection ? 'selected' : ''}>${p.name} (ELO ${eloRatings[p.name]||ELO_BASE})</option>`).join('');
   if (!oddsSelect.value) {
     if (currentPlayer) oddsSelect.value = currentPlayer;
-    else if (data.players.length > 0) {
-      oddsSelect.value = [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE))[0].name;
-    }
+    else if (data.players.length > 0)
+      oddsSelect.value = [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE)-(eloRatings[a.name]||ELO_BASE))[0].name;
   }
   const selectedOddsPlayer = oddsSelect.value;
   const oddsList            = document.getElementById('odds-list');
@@ -1385,15 +1520,15 @@ function render() {
   if (selectedOddsPlayer) {
     const playerElo = eloRatings[selectedOddsPlayer] || ELO_BASE;
     oddsPlayerInfo.style.display = 'flex';
-    document.getElementById('odds-player-name').innerHTML   = `${getPlayerBadge(selectedOddsPlayer)}${selectedOddsPlayer}`;
-    document.getElementById('odds-player-elo').textContent  = `ELO ${playerElo}`;
+    document.getElementById('odds-player-name').innerHTML  = `${getPlayerBadge(selectedOddsPlayer)}${selectedOddsPlayer}`;
+    document.getElementById('odds-player-elo').textContent = `ELO ${playerElo}`;
     const opponents = data.players.filter(p => p.name !== selectedOddsPlayer)
       .map(p => {
         const oppElo = eloRatings[p.name] || ELO_BASE;
         const odds   = getEloOdds(playerElo, oppElo);
         const h2h    = getH2H(selectedOddsPlayer, p.name);
         return { ...p, oppElo, ...odds, h2h };
-      }).sort((a, b) => a.winProb - b.winProb);
+      }).sort((a,b) => a.winProb - b.winProb);
     oddsList.innerHTML = opponents.map(op => {
       const difficulty = op.winProb < 40 ? 'hard' : op.winProb <= 60 ? 'medium' : 'easy';
       const barColor   = difficulty === 'hard' ? '#ef4444' : difficulty === 'medium' ? '#f59e0b' : '#4ade80';
@@ -1410,9 +1545,7 @@ function render() {
             <span class="elo-change-loss">${op.changeLoss}</span>
           </div>
         </div>
-        <div class="odds-win-bar-bg">
-          <div class="odds-win-bar" style="width:${op.winProb}%;background:${barColor}"></div>
-        </div>
+        <div class="odds-win-bar-bg"><div class="odds-win-bar" style="width:${op.winProb}%;background:${barColor}"></div></div>
         <div class="win-prob-label">
           <span style="color:${barColor};font-weight:700">${op.winProb}% win</span>
           <span>${op.lossProb}% loss</span>
@@ -1425,28 +1558,23 @@ function render() {
     oddsList.innerHTML = '<div class="empty">Select a player to see their matchup odds</div>';
   }
 
-  /* --- Language / Category filter ---
-     Only show categories that have at least one player
-  --- */
-  const lf = document.getElementById('lang-filter');
+  /* --- Category filter — only show categories with at least one player --- */
+  const lf        = document.getElementById('lang-filter');
   const usedCodes = new Set(data.players.map(p => p.lang).filter(Boolean));
-  const allBtn = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
-  const catBtns = CATEGORIES.filter(c => usedCodes.has(c.code)).map(c => {
-    const badge = c.icon
-      ? `<span style="font-size:14px;margin-right:4px">${c.icon}</span>`
-      : `<img src="https://flagcdn.com/20x15/${c.country}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">`;
-    return `<button class="lang-btn ${activeLang === c.code ? 'active' : ''}" onclick="setLangFilter('${c.code}')">${badge}${c.label}</button>`;
-  }).join('');
+  const allBtn    = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
+  const catBtns   = categories.filter(c => usedCodes.has(c.code)).map(c =>
+    `<button class="lang-btn ${activeLang === c.code ? 'active' : ''}" onclick="setLangFilter('${c.code}')">
+      ${getCategoryBadgeSmall(c)}${c.label}
+    </button>`
+  ).join('');
   lf.innerHTML = allBtn + catBtns;
 
   /* --- Leaderboard --- */
-  const filteredPlayers = activeLang === 'all'
-    ? data.players
-    : data.players.filter(p => p.lang === activeLang);
+  const filteredPlayers = activeLang === 'all' ? data.players : data.players.filter(p => p.lang === activeLang);
   const minM     = settings.minMatches || 0;
   const ranked   = filteredPlayers.filter(p => getStats(p.name).total >= minM);
-  const unranked = filteredPlayers.filter(p => getStats(p.name).total < minM);
-  ranked.sort((a, b) => (eloRatings[b.name] || ELO_BASE) - (eloRatings[a.name] || ELO_BASE));
+  const unranked = filteredPlayers.filter(p => getStats(p.name).total <  minM);
+  ranked.sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE));
 
   const lb = document.getElementById('leaderboard');
   if (filteredPlayers.length === 0) {
@@ -1454,10 +1582,10 @@ function render() {
   } else {
     const medals     = ['🥇','🥈','🥉'];
     const rankedHTML = ranked.map((p, i) => {
-      const s            = getStats(p.name);
-      const elo          = eloRatings[p.name] || ELO_BASE;
-      const eloBarWidth  = maxElo === minElo ? 50 : Math.round(((elo - minElo) / (maxElo - minElo)) * 100);
-      const isSelected   = selectedPlayer === p.name;
+      const s           = getStats(p.name);
+      const elo         = eloRatings[p.name] || ELO_BASE;
+      const eloBarWidth = maxElo === minElo ? 50 : Math.round(((elo-minElo)/(maxElo-minElo))*100);
+      const isSelected  = selectedPlayer === p.name;
       let dropdown = '';
       if (isSelected) {
         const overallHTML = `<div class="h2h-overall">
@@ -1466,11 +1594,9 @@ function render() {
           <div><span class="loss">${s.losses}</span><span>Losses</span></div>
           <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
         </div>`;
-        const opponents = data.players
-          .filter(op => op.name !== p.name)
+        const opponents = data.players.filter(op => op.name !== p.name)
           .map(op => ({ name: op.name, ...getH2H(p.name, op.name) }))
-          .filter(op => op.total > 0)
-          .sort((a, b) => b.total - a.total);
+          .filter(op => op.total > 0).sort((a,b) => b.total - a.total);
         const opponentsHTML = opponents.length === 0
           ? '<div style="color:#475569;font-size:13px;text-align:center;padding:8px">No matches yet</div>'
           : opponents.map(op => `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
@@ -1490,7 +1616,7 @@ function render() {
       return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer('${p.name}')">
         <div class="row">
           <div style="display:flex;align-items:center">
-            <span class="medal">${medals[i] || (i+1)+'.'}</span>
+            <span class="medal">${medals[i]||(i+1)+'.'}</span>
             <span style="font-weight:700;font-size:16px">${getPlayerBadge(p.name)}${p.name}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
@@ -1507,11 +1633,10 @@ function render() {
 
     const unrankedHTML = unranked.length === 0 ? '' :
       `<div style="color:#64748b;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 8px;">
-        Unranked (less than ${minM} match${minM !== 1 ? 'es' : ''})
+        Unranked (less than ${minM} match${minM!==1?'es':''})
       </div>` +
       unranked.map(p => {
-        const s   = getStats(p.name);
-        const elo = eloRatings[p.name] || ELO_BASE;
+        const s = getStats(p.name); const elo = eloRatings[p.name]||ELO_BASE;
         return `<div class="card" style="opacity:0.6">
           <div class="row">
             <div style="display:flex;align-items:center;gap:8px">
@@ -1520,7 +1645,7 @@ function render() {
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <span class="elo-badge">ELO ${elo}</span>
-              <span class="win"  style="font-size:13px">${s.wins}W</span>
+              <span class="win" style="font-size:13px">${s.wins}W</span>
               <span class="loss" style="font-size:13px">${s.losses}L</span>
             </div>
           </div>
@@ -1529,36 +1654,33 @@ function render() {
     lb.innerHTML = rankedHTML + unrankedHTML;
   }
 
-  /* --- General stats & team rankings --- */
+  /* --- General stats & category rankings --- */
   const gs               = document.getElementById('general-stats');
   const confirmedMatches = getConfirmed();
   const teamEloHTML = (() => {
-    const teams = CATEGORIES.map(c => {
-      const cPlayers = data.players.filter(p => p.lang === c.code);
+    const teams = categories.map(c => {
+      const cPlayers     = data.players.filter(p => p.lang === c.code);
       if (cPlayers.length === 0) return null;
-      const avgElo      = Math.round(cPlayers.reduce((sum, p) => sum + (eloRatings[p.name] || ELO_BASE), 0) / cPlayers.length);
-      const cNames      = cPlayers.map(p => p.name);
-      const totalWins   = confirmedMatches.filter(m => cNames.includes(m.winner)).length;
-      const totalMatches= confirmedMatches.filter(m => cNames.includes(m.winner) || cNames.includes(m.loser)).length;
-      const winRate     = totalMatches === 0 ? 0 : Math.round((totalWins / totalMatches) * 100);
+      const avgElo       = Math.round(cPlayers.reduce((s,p) => s+(eloRatings[p.name]||ELO_BASE),0)/cPlayers.length);
+      const cNames       = cPlayers.map(p => p.name);
+      const totalWins    = confirmedMatches.filter(m => cNames.includes(m.winner)).length;
+      const totalMatches = confirmedMatches.filter(m => cNames.includes(m.winner)||cNames.includes(m.loser)).length;
+      const winRate      = totalMatches===0?0:Math.round((totalWins/totalMatches)*100);
       return { ...c, avgElo, cPlayers, totalMatches, winRate };
     }).filter(Boolean);
     if (teams.length === 0) return '';
-    teams.sort((a, b) => b.avgElo - a.avgElo);
+    teams.sort((a,b) => b.avgElo - a.avgElo);
     const teamMedals = ['🥇','🥈','🥉'];
-    const maxTeamElo = Math.max(...teams.map(t => t.avgElo));
-    const minTeamElo = Math.min(...teams.map(t => t.avgElo));
-    return `<div class="gen-stats-title">🌍 Category Rankings</div>
+    const maxT = Math.max(...teams.map(t=>t.avgElo));
+    const minT = Math.min(...teams.map(t=>t.avgElo));
+    return `<div class="gen-stats-title">🏷️ Category Rankings</div>
       <div class="gen-stat-card">
-        ${teams.map((t, i) => {
-          const barW  = maxTeamElo === minTeamElo ? 50 : Math.round(((t.avgElo - minTeamElo) / (maxTeamElo - minTeamElo)) * 100);
-          const badge = t.icon
-            ? `<span style="font-size:18px">${t.icon}</span>`
-            : `<img src="https://flagcdn.com/20x15/${t.country}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;">`;
+        ${teams.map((t,i) => {
+          const barW = maxT===minT?50:Math.round(((t.avgElo-minT)/(maxT-minT))*100);
           return `<div class="team-elo-row">
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:16px">${teamMedals[i] || (i+1)+'.'}</span>
-              ${badge}
+              <span style="font-size:16px">${teamMedals[i]||(i+1)+'.'}</span>
+              ${getCategoryBadge(t.code)}
               <div>
                 <div style="font-weight:700;font-size:14px">${t.label}</div>
                 <div style="color:#64748b;font-size:11px">${t.cPlayers.length} players · ${t.totalMatches} matches</div>
@@ -1574,44 +1696,36 @@ function render() {
       </div>`;
   })();
 
-  if (confirmedMatches.length === 0 && !teamEloHTML) {
+  if (confirmedMatches.length===0 && !teamEloHTML) {
     gs.innerHTML = '';
   } else {
-    const mostActive = [...data.players].sort((a,b) => getStats(b.name).total - getStats(a.name).total)[0];
-    let biggestRivalry = null, maxRivalMatches = 0;
-    for (let i = 0; i < data.players.length; i++) {
-      for (let j = i+1; j < data.players.length; j++) {
-        const h = getH2H(data.players[i].name, data.players[j].name);
-        if (h.total > maxRivalMatches) {
-          maxRivalMatches = h.total;
-          biggestRivalry  = { p1: data.players[i].name, p2: data.players[j].name, ...h };
-        }
-      }
+    const mostActive = [...data.players].sort((a,b)=>getStats(b.name).total-getStats(a.name).total)[0];
+    let biggestRivalry=null, maxRival=0;
+    for (let i=0;i<data.players.length;i++) for (let j=i+1;j<data.players.length;j++) {
+      const h=getH2H(data.players[i].name,data.players[j].name);
+      if (h.total>maxRival){maxRival=h.total;biggestRivalry={p1:data.players[i].name,p2:data.players[j].name,...h};}
     }
-    let bestStreakPlayer = '', bestStreak = 0;
-    data.players.forEach(p => {
-      let best = 0, current = 0;
-      getConfirmed().forEach(m => {
-        if (m.winner === p.name) { current++; best = Math.max(best, current); }
-        else if (m.loser === p.name) { current = 0; }
-      });
-      if (best > bestStreak) { bestStreak = best; bestStreakPlayer = p.name; }
+    let bestStreakPlayer='', bestStreak=0;
+    data.players.forEach(p=>{
+      let best=0,cur=0;
+      getConfirmed().forEach(m=>{if(m.winner===p.name){cur++;best=Math.max(best,cur);}else if(m.loser===p.name){cur=0;}});
+      if(best>bestStreak){bestStreak=best;bestStreakPlayer=p.name;}
     });
-    gs.innerHTML = `
-      ${confirmedMatches.length > 0 ? `
+    gs.innerHTML=`
+      ${confirmedMatches.length>0?`
       <div class="gen-stats-title">🔢 General Stats</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${confirmedMatches.length}</div></div>
         <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
       </div>
-      ${mostActive ? `<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getPlayerBadge(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name]||ELO_BASE}</div></div>` : ''}
-      ${biggestRivalry ? `<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')"><div class="label">Biggest rivalry ↗</div><div class="value">${getPlayerBadge(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getPlayerBadge(biggestRivalry.p2)}${biggestRivalry.p2}</div><div class="sub">${biggestRivalry.total} matches together</div></div>` : ''}
-      ${bestStreak > 0 ? `<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getPlayerBadge(bestStreakPlayer)}${bestStreakPlayer}</div><div class="sub">${bestStreak} wins in a row</div></div>` : ''}
-      ` : ''}
+      ${mostActive?`<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getPlayerBadge(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name]||ELO_BASE}</div></div>`:''}
+      ${biggestRivalry?`<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')"><div class="label">Biggest rivalry ↗</div><div class="value">${getPlayerBadge(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getPlayerBadge(biggestRivalry.p2)}${biggestRivalry.p2}</div><div class="sub">${biggestRivalry.total} matches together</div></div>`:''}
+      ${bestStreak>0?`<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getPlayerBadge(bestStreakPlayer)}${bestStreakPlayer}</div><div class="sub">${bestStreak} wins in a row</div></div>`:''}
+      `:''}
       ${teamEloHTML}`;
   }
 
-  /* --- History tab pending + disputed sections --- */
+  /* --- History pending + disputed sections --- */
   const pendingSection  = document.getElementById('pending-section');
   const pendingList     = document.getElementById('pending-list');
   const disputedSection = document.getElementById('disputed-section');
@@ -1633,12 +1747,8 @@ function render() {
             <button class="btn-act btn-act-dispute" onclick="rejectMatch(${m.idx})">🚨 Dispute</button>
           </div>
         </div>`).join('');
-    } else {
-      pendingSection.style.display = 'none';
-    }
-  } else {
-    pendingSection.style.display = 'none';
-  }
+    } else { pendingSection.style.display = 'none'; }
+  } else { pendingSection.style.display = 'none'; }
 
   if (isAdmin) {
     const disputed = getDisputedMatches();
@@ -1657,38 +1767,29 @@ function render() {
             <button class="btn-act btn-act-delete"  onclick="adminResolveDispute(${m.idx},'delete')">🗑️ Delete</button>
           </div>
         </div>`).join('');
-    } else {
-      disputedSection.style.display = 'none';
-    }
-  } else {
-    disputedSection.style.display = 'none';
-  }
+    } else { disputedSection.style.display = 'none'; }
+  } else { disputedSection.style.display = 'none'; }
 
   /* --- History navigation & match list --- */
-  const targetDate    = getDateForOffset(historyDayOffset);
-  const dateLabel     = getDateLabel(historyDayOffset);
-  document.getElementById('history-date-label').textContent = dateLabel;
-  document.getElementById('history-next-btn').disabled      = historyDayOffset >= 0;
+  const targetDate = getDateForOffset(historyDayOffset);
+  document.getElementById('history-date-label').textContent   = getDateLabel(historyDayOffset);
+  document.getElementById('history-next-btn').disabled        = historyDayOffset >= 0;
 
-  const eloChanges    = calculateEloChanges();
-  const hl            = document.getElementById('history-list');
-  // Filter matches for selected day
-  const dayMatches    = data.matches
-    .map((m, i) => ({ ...m, origIdx: i }))
-    .filter(m => m.date === targetDate)
-    .reverse();
+  const eloChanges = calculateEloChanges();
+  const hl         = document.getElementById('history-list');
+  const dayMatches = data.matches.map((m,i)=>({...m,origIdx:i})).filter(m=>m.date===targetDate).reverse();
 
   if (dayMatches.length === 0) {
     hl.innerHTML = '<div class="empty">No matches on this day.</div>';
   } else {
     hl.innerHTML = dayMatches.map(m => {
-      const i            = m.origIdx;
-      const isProvisional= m.status === 'provisional';
-      const isDisputed   = m.status === 'disputed';
-      const canEdit      = isAdmin || (currentPlayer && (m.winner === currentPlayer || m.loser === currentPlayer));
-      const canDelete    = isAdmin || (currentPlayer && m.loggedBy === currentPlayer);
-      const isEditing    = editingMatch === i;
-      const eloChange    = eloChanges[i];
+      const i             = m.origIdx;
+      const isProvisional = m.status === 'provisional';
+      const isDisputed    = m.status === 'disputed';
+      const canEdit       = isAdmin || (currentPlayer && (m.winner===currentPlayer||m.loser===currentPlayer));
+      const canDelete     = isAdmin || (currentPlayer && m.loggedBy===currentPlayer);
+      const isEditing     = editingMatch === i;
+      const eloChange     = eloChanges[i];
 
       let statusBadge = '';
       if (isProvisional) statusBadge = '<span style="color:#38bdf8;font-size:11px;margin-right:4px;font-weight:700">✅⏳</span>';
@@ -1698,45 +1799,38 @@ function render() {
       if (isEditing && canEdit) {
         editSection = `<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
           <select id="edit-winner-${i}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p => `<option value="${p.name}" ${p.name === m.winner ? 'selected' : ''}>${p.name}</option>`).join('')}
+            ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.winner?'selected':''}>${p.name}</option>`).join('')}
           </select>
           <select id="edit-loser-${i}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p => `<option value="${p.name}" ${p.name === m.loser ? 'selected' : ''}>${p.name}</option>`).join('')}
+            ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.loser?'selected':''}>${p.name}</option>`).join('')}
           </select>
           <button class="btn-act btn-act-confirm" onclick="saveEditMatch(${i})">Save</button>
         </div>`;
       }
 
-      return `<div class="card ${isProvisional ? 'provisional' : isDisputed ? 'disputed' : ''}">
+      return `<div class="card ${isProvisional?'provisional':isDisputed?'disputed':''}">
         <div class="row">
           <span style="font-size:14px">
             ${statusBadge}
-            <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span>
-            beat
+            <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> beat
             <span class="loss">${getPlayerBadge(m.loser)}${m.loser}</span>
           </span>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <span style="color:#475569;font-size:12px">${m.date}</span>
-            ${eloChange ? `<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>` : ''}
-            ${isProvisional && isAdmin ? `
-              <button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button>
-              <button class="btn-act btn-act-delete"  onclick="rejectMatch(${i})">🗑️</button>` : ''}
-            ${isProvisional && currentPlayer && m.loser === currentPlayer ? `
-              <button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button>
-              <button class="btn-act btn-act-dispute" onclick="rejectMatch(${i})">🚨</button>` : ''}
-            ${canEdit && !isProvisional && !isDisputed ? `
-              <button class="btn-act btn-act-edit" onclick="startEditMatch(${i})">✏️</button>` : ''}
-            ${canDelete && !isDisputed ? `
-              <button class="btn-act btn-act-delete" onclick="${isAdmin ? 'deleteMatch' : 'rejectMatch'}(${i})">🗑️</button>` : ''}
+            ${eloChange?`<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>`:''}
+            ${isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch(${i})">🗑️</button>`:''}
+            ${isProvisional&&currentPlayer&&m.loser===currentPlayer?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch(${i})">🚨</button>`:''}
+            ${canEdit&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch(${i})">✏️</button>`:''}
+            ${canDelete&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="${isAdmin?'deleteMatch':'rejectMatch'}(${i})">🗑️</button>`:''}
           </div>
         </div>
-        ${isDisputed ? `<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy||m.loser} — waiting for admin</div>` : ''}
+        ${isDisputed?`<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy||m.loser} — waiting for admin</div>`:''}
         ${editSection}
       </div>`;
     }).join('');
   }
 
-  /* --- Player list in Players tab --- */
+  /* --- Player list --- */
   const pl = document.getElementById('player-list');
   if (!pl) return;
   if (data.players.length === 0) {
@@ -1746,11 +1840,10 @@ function render() {
       const s         = getStats(p.name);
       const elo       = eloRatings[p.name] || ELO_BASE;
       const isEditing = editingPlayer === p.name;
-      const catObj    = getCategoryObj(p.lang);
       let editSection = '';
       if (isEditing) {
-        const catOptions = `<option value="">No category</option>` +
-          CATEGORIES.map(c => `<option value="${c.code}" ${p.lang === c.code ? 'selected' : ''}>${c.icon || '🏳️'} ${c.label}</option>`).join('');
+        const catOptions = '<option value="">No category</option>' +
+          categories.map(c => `<option value="${c.code}" ${p.lang===c.code?'selected':''}>${c.type==='emoji'?c.value:'🏳️'} ${c.label}</option>`).join('');
         editSection = `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
           <div style="display:flex;gap:6px;">
             <input id="edit-player-${p.name}" value="${p.name}" style="margin-bottom:0;flex:1;">
@@ -1779,49 +1872,56 @@ function render() {
 }
 
 /* ----------------------------------------------------------
-  9.14 Window exports
-  Makes functions accessible from HTML onclick attributes
+  9.16 Window exports
+  Make functions accessible from HTML onclick attributes
 ---------------------------------------------------------- */
-window.switchTab           = switchTab;
-window.setLangFilter       = setLangFilter;
-window.togglePlayer        = togglePlayer;
-window.toggleEloInfo       = toggleEloInfo;
-window.setResult           = setResult;
-window.openH2H             = openH2H;
-window.closeH2H            = closeH2H;
-window.addPlayer           = addPlayer;
-window.deletePlayer        = deletePlayer;
-window.startEditPlayer     = startEditPlayer;
-window.saveEditPlayer      = saveEditPlayer;
-window.logMatch            = logMatch;
-window.deleteMatch         = deleteMatch;
-window.startEditMatch      = startEditMatch;
-window.saveEditMatch       = saveEditMatch;
-window.confirmMatch        = confirmMatch;
-window.rejectMatch         = rejectMatch;
-window.exportData          = exportData;
-window.importData          = importData;
-window.resetData           = resetData;
-window.saveSettings        = saveSettings;
-window.showAdminLogin      = showAdminLogin;
-window.hideAdminLogin      = hideAdminLogin;
-window.attemptAdminLogin   = attemptAdminLogin;
-window.adminLogout         = adminLogout;
-window.showPlayerLogin     = showPlayerLogin;
-window.hidePlayerLogin     = hidePlayerLogin;
-window.attemptPlayerLogin  = attemptPlayerLogin;
-window.playerLogout        = playerLogout;
-window.scrollToPending     = scrollToPending;
-window.changePassword      = changePassword;
-window.approvalConfirm     = approvalConfirm;
-window.approvalDispute     = approvalDispute;
-window.closeApprovalModal  = closeApprovalModal;
-window.adminResolveDispute = adminResolveDispute;
-window.closeAdminDisputedModal = closeAdminDisputedModal;
-window.showAdminDisputedModal  = showAdminDisputedModal;
-window.historyPrevDay      = historyPrevDay;
-window.historyNextDay      = historyNextDay;
-window.render              = render;
+window.switchTab              = switchTab;
+window.setLangFilter          = setLangFilter;
+window.togglePlayer           = togglePlayer;
+window.toggleEloInfo          = toggleEloInfo;
+window.setResult              = setResult;
+window.openH2H                = openH2H;
+window.closeH2H               = closeH2H;
+window.addPlayer              = addPlayer;
+window.deletePlayer           = deletePlayer;
+window.startEditPlayer        = startEditPlayer;
+window.saveEditPlayer         = saveEditPlayer;
+window.logMatch               = logMatch;
+window.deleteMatch            = deleteMatch;
+window.startEditMatch         = startEditMatch;
+window.saveEditMatch          = saveEditMatch;
+window.confirmMatch           = confirmMatch;
+window.rejectMatch            = rejectMatch;
+window.exportData             = exportData;
+window.importData             = importData;
+window.resetData              = resetData;
+window.saveSettings           = saveSettings;
+window.showAdminLogin         = showAdminLogin;
+window.hideAdminLogin         = hideAdminLogin;
+window.attemptAdminLogin      = attemptAdminLogin;
+window.adminLogout            = adminLogout;
+window.showPlayerLogin        = showPlayerLogin;
+window.hidePlayerLogin        = hidePlayerLogin;
+window.attemptPlayerLogin     = attemptPlayerLogin;
+window.playerLogout           = playerLogout;
+window.scrollToPending        = scrollToPending;
+window.changePassword         = changePassword;
+window.approvalConfirm        = approvalConfirm;
+window.approvalDispute        = approvalDispute;
+window.closeApprovalModal     = closeApprovalModal;
+window.adminResolveDispute    = adminResolveDispute;
+window.closeAdminDisputedModal= closeAdminDisputedModal;
+window.showAdminDisputedModal = showAdminDisputedModal;
+window.historyPrevDay         = historyPrevDay;
+window.historyNextDay         = historyNextDay;
+window.render                 = render;
+window.addCategory            = addCategory;
+window.editCategory           = editCategory;
+window.saveEditCategory       = saveEditCategory;
+window.deleteCategory         = deleteCategory;
+window.closeEditCategoryModal = closeEditCategoryModal;
+window.toggleCatTypeInputs    = toggleCatTypeInputs;
+window.toggleEditCatInputs    = toggleEditCatInputs;
 
 render();
 </script>
