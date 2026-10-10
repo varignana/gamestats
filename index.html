@@ -313,6 +313,17 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
       <div id="admin-content" style="display:none">
 
+        <!-- Password reset requests + account migration -->
+        <div class="section-title">🔑 Password reset requests</div>
+        <div id="reset-requests" style="margin-bottom:16px"></div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="section-title" style="font-size:14px;margin-bottom:6px">🔐 Secure logins</div>
+          <p style="color:#94a3b8;font-size:12px;margin:0 0 10px">One-off upgrade: moves everyone's current password into Firebase Authentication. Nobody has to change anything.</p>
+          <button class="btn-outline" onclick="migratePlayers()">1. Migrate players to secure logins</button>
+          <button class="btn-outline" onclick="deleteLegacyPasswords()">2. Delete old plain-text passwords</button>
+          <div id="migration-status" style="color:#94a3b8;font-size:12px;margin-top:8px"></div>
+        </div>
+
         <!-- Add Player -->
         <div class="section-title">Add Player</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -382,11 +393,19 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       <div id="my-account" style="display:none">
         <div class="section-title">👤 My Account</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <label>Current password</label>
+          <input type="password" id="current-password" placeholder="Enter current password..." style="margin-bottom:10px">
           <label>New password</label>
           <input type="password" id="new-password" placeholder="Enter new password..." style="margin-bottom:10px">
           <label>Confirm new password</label>
           <input type="password" id="confirm-password" placeholder="Confirm new password..." style="margin-bottom:10px">
           <button class="btn" onclick="changePassword()">Change Password</button>
+        </div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <label>Recovery email (optional)</label>
+          <p style="color:#94a3b8;font-size:12px;margin:0 0 10px">Only you and the admin can see it. It lets you reset your own password without asking the admin.</p>
+          <input type="email" id="my-email" placeholder="you@example.com" style="margin-bottom:10px">
+          <button class="btn" onclick="saveMyEmail()">Save email</button>
         </div>
       </div>
     </div>
@@ -398,6 +417,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       7.3 Forced approval
       7.4 Admin disputed
       7.5 Edit category
+      7.6 Forgot password
     ============================================================ -->
 
     <!-- 7.1 Admin Login -->
@@ -422,6 +442,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <label>Password</label>
         <input type="password" id="player-login-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptPlayerLogin()">
         <button class="btn" onclick="attemptPlayerLogin()">Login</button>
+        <button class="btn-outline" onclick="showResetModal()">Forgot password?</button>
         <button class="btn-danger" onclick="hidePlayerLogin()">Cancel</button>
       </div>
     </div>
@@ -443,6 +464,17 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <p>These matches have been disputed. Please review and decide.</p>
         <div id="admin-disputed-list"></div>
         <button class="btn" onclick="closeAdminDisputedModal()">Done</button>
+      </div>
+    </div>
+
+    <!-- 7.6 Forgot password -->
+    <div id="reset-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>🔑 Forgot password</h3>
+        <label>Select your name</label>
+        <select id="reset-select" onchange="refreshResetState()" style="margin-bottom:12px"><option value="">Select player...</option></select>
+        <div id="reset-body"></div>
+        <button class="btn-danger" onclick="hideResetModal()">Close</button>
       </div>
     </div>
 
@@ -501,6 +533,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.14 Tab switching & UI helpers
   9.15 Main render function
   9.16 Window exports
+  9.17 Secure accounts (Firebase Auth login, migration, reset, recovery email)
 ============================================================ -->
 <script type="module">
 
@@ -508,7 +541,13 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.1 Firebase imports & config
 ---------------------------------------------------------- */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, deleteDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  initializeAuth, browserSessionPersistence, browserLocalPersistence, inMemoryPersistence,
+  onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously,
+  signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, linkWithCredential,
+  sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
 
 const firebaseConfig = {
@@ -524,6 +563,23 @@ const firebaseConfig = {
 const app        = initializeApp(firebaseConfig);
 const db         = getFirestore(app);
 const analytics  = getAnalytics(app);
+
+// 1.1 Main login session. Session persistence = you stay logged in while the tab is open,
+//     exactly like the old sessionStorage behaviour.
+const auth = initializeAuth(app, { persistence: browserSessionPersistence });
+
+// 1.2 Three extra Firebase "apps" so special logins never disturb the main session:
+//     tmp   – admin creates player logins (in memory, signed out straight away)
+//     reset – a visitor asking for a password reset (kept in the browser so it survives a reload)
+//     proof – proves ownership of a recovery email (in memory)
+const tmpApp    = initializeApp(firebaseConfig, 'tmp');
+const tmpAuth   = initializeAuth(tmpApp,   { persistence: inMemoryPersistence });
+const resetApp  = initializeApp(firebaseConfig, 'reset');
+const resetAuth = initializeAuth(resetApp, { persistence: browserLocalPersistence });
+const resetDb   = getFirestore(resetApp);
+const proofApp  = initializeApp(firebaseConfig, 'proof');
+const proofAuth = initializeAuth(proofApp, { persistence: inMemoryPersistence });
+const proofDb   = getFirestore(proofApp);
 
 // Firebase document references
 const dataRef        = doc(db, 'gamestats', 'data');
@@ -556,7 +612,12 @@ const ELO_BASE = 1000;
 let data            = { players: [], matches: [] };
 let settings        = { minMatches: 0 };
 let categories      = [...DEFAULT_CATEGORIES]; // live categories from Firebase
-let playerPasswords = {};
+let currentPid      = null;   // id of the logged-in player (name can change, id never does)
+let resetRequests   = {};     // pending password-reset requests (admin panel)
+let myEmail         = '';     // recovery email of the logged-in player
+let editEmailDraft  = {};     // admin edit box: email typed so far (survives live re-renders)
+let dataReadyResolve;
+const dataReady     = new Promise(r => { dataReadyResolve = r; });   // resolves once the player list has loaded
 let editingMatch    = null;
 let editingPlayer   = null;
 let selectedPlayer  = null;
@@ -589,7 +650,7 @@ onSnapshot(categoriesRef, (snap) => {
   } else {
     // First time — save defaults to Firebase
     categories = [...DEFAULT_CATEGORIES];
-    setDoc(categoriesRef, { list: categories });
+    if (isAdmin) setDoc(categoriesRef, { list: categories });   // only the admin may write it
   }
   render();
 });
@@ -605,13 +666,16 @@ onSnapshot(dataRef, (snap) => {
   }
   autoApprovePreviousDays();
   setSyncStatus('live');
+  dataReadyResolve();
   render();
 }, () => setSyncStatus('error'));
 
-// Player passwords listener
-onSnapshot(playersAuthRef, (snap) => {
-  if (snap.exists()) { playerPasswords = snap.data(); }
-});
+// Password reset requests (the admin panel shows them)
+onSnapshot(collection(db, 'resets'), (snap) => {
+  resetRequests = {};
+  snap.forEach(d => { resetRequests[d.id] = d.data(); });
+  render();
+}, () => {});
 
 /* ----------------------------------------------------------
   9.4 Utility functions
@@ -884,6 +948,7 @@ async function deleteCategory(code) {
   from previous days
 ---------------------------------------------------------- */
 async function autoApprovePreviousDays() {
+  if (!isAdmin && !currentPid) return;          // only logged-in users may write
   const today   = new Date().toLocaleDateString();
   let changed   = false;
   data.matches.forEach(m => {
@@ -911,28 +976,34 @@ async function attemptAdminLogin() {
   const username = document.getElementById('admin-username').value.trim();
   const password = document.getElementById('admin-password').value;
   try {
-    const snap = await getDoc(adminRef);
-    if (snap.exists()) {
-      const creds = snap.data();
-      if (username === creds.username && password === creds.password) {
-        isAdmin = true;
-        sessionStorage.setItem('isAdmin', 'true');
-        hideAdminLogin();
-        showMessage('Welcome admin! 👋', 'success');
-        logEvent(analytics, 'admin_login');
-        if (getDisputedMatches().length > 0) showAdminDisputedModal();
-        render();
-      } else {
-        showMessage('Wrong username or password!', 'error');
-      }
+    let cred;
+    try {
+      cred = await signInWithEmailAndPassword(auth, ADMIN_ALIAS, pad(password));
+    } catch (e) {
+      // First time after the upgrade: the secure admin account does not exist yet.
+      // Check the old credentials once (works only while the old database rules are still on).
+      const snap = await getDoc(adminRef);
+      if (!(snap.exists() && username === snap.data().username && password === snap.data().password)) throw e;
+      cred = await createUserWithEmailAndPassword(auth, ADMIN_ALIAS, pad(password));
+      await setDoc(doc(db, 'admins', cred.user.uid), { createdAt: Date.now() });
     }
+    const ok = await getDoc(doc(db, 'admins', cred.user.uid));
+    if (!ok.exists()) { await signOut(auth); showMessage('Wrong username or password!', 'error'); return; }
+    isAdmin = true;
+    hideAdminLogin();
+    showMessage('Welcome admin! 👋', 'success');
+    logEvent(analytics, 'admin_login');
+    autoApprovePreviousDays();
+    if (getDisputedMatches().length > 0) showAdminDisputedModal();
+    render();
   } catch(e) {
-    showMessage('Login error: ' + e.message, 'error');
+    console.warn('Admin login failed:', e.code || e.message);   // visible in the browser console for debugging
+    showMessage('Wrong username or password!', 'error');
   }
 }
-function adminLogout() {
+async function adminLogout() {
   isAdmin = false;
-  sessionStorage.removeItem('isAdmin');
+  await signOut(auth);
   logEvent(analytics, 'admin_logout');
   render();
   showMessage('Admin logged out!', 'info');
@@ -991,13 +1062,18 @@ async function attemptPlayerLogin() {
   const name     = document.getElementById('player-login-select').value;
   const password = document.getElementById('player-login-password').value;
   if (!name) { showMessage('Please select your name!', 'error'); return; }
-  const storedPassword = playerPasswords[name];
-  if (!storedPassword) { showMessage('No password set. Ask admin!', 'error'); return; }
-  if (password === storedPassword) {
+  const p = data.players.find(x => x.name === name);
+  if (!p || !p.pid) { showMessage('No password set. Ask admin!', 'error'); return; }
+  try {
+    const cred = await signInWithEmailAndPassword(auth, aliasFor(p), pad(password));
+    const map  = await getDoc(doc(db, 'authMap', cred.user.uid));
+    if (!map.exists() || map.data().pid !== p.pid) { await signOut(auth); throw new Error('not mapped'); }
+    currentPid    = p.pid;
     currentPlayer = name;
-    sessionStorage.setItem('currentPlayer', name);
     hidePlayerLogin();
     logEvent(analytics, 'player_login', { player_name: name });
+    autoApprovePreviousDays();
+    refreshMyEmail();
     const pending = getPendingForPlayer(name);
     if (pending.length > 0) {
       showApprovalModal(name);
@@ -1005,14 +1081,16 @@ async function attemptPlayerLogin() {
       showMessage('Welcome ' + name + '! 👋', 'success');
     }
     render();
-  } else {
+  } catch(e) {
     showMessage('Wrong password!', 'error');
     logEvent(analytics, 'player_login_failed');
   }
 }
-function playerLogout() {
+async function playerLogout() {
   currentPlayer = null;
-  sessionStorage.removeItem('currentPlayer');
+  currentPid    = null;
+  myEmail       = '';
+  await signOut(auth);
   logEvent(analytics, 'player_logout');
   render();
   showMessage('Logged out!', 'info');
@@ -1229,10 +1307,12 @@ async function addPlayer() {
   if (data.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
     showMessage('Player already exists!', 'error'); return;
   }
-  data.players.push({ name, lang });
-  playerPasswords[name] = password;
-  await save();
-  await setDoc(playersAuthRef, playerPasswords);
+  const player = { name, lang, pid: newId(), av: 0 };
+  try {
+    await createLogin(player, password);          // 1. secure login first
+  } catch(e) { showMessage('Could not create login: ' + e.code, 'error'); return; }
+  data.players.push(player);
+  await save();                                    // 2. then the player record
   document.getElementById('newPlayer').value         = '';
   document.getElementById('newPlayerLang').value     = '';
   document.getElementById('newPlayerPassword').value = '';
@@ -1242,10 +1322,18 @@ async function addPlayer() {
 
 async function deletePlayer(name) {
   if (!confirm('Delete ' + name + '?')) return;
-  data.players = data.players.filter(p => p.name !== name);
-  delete playerPasswords[name];
+  const p = data.players.find(x => x.name === name);
+  data.players = data.players.filter(x => x.name !== name);
   await save();
-  await setDoc(playersAuthRef, playerPasswords);
+  if (p && p.pid) {                                // remove the login mapping so the old login stops working
+    try {
+      const old = await getDoc(doc(db, 'playerAuth', p.pid));
+      if (old.exists()) await deleteDoc(doc(db, 'authMap', old.data().uid));
+      await deleteDoc(doc(db, 'playerAuth',   p.pid));
+      await deleteDoc(doc(db, 'playerEmails', p.pid));
+      await deleteDoc(doc(db, 'resets',       p.pid));
+    } catch(e) {}
+  }
 }
 
 function startEditPlayer(name) {
@@ -1256,6 +1344,7 @@ function startEditPlayer(name) {
       const input = document.getElementById('edit-player-' + name);
       if (input) { input.focus(); input.select(); }
     }, 50);
+    loadEditEmail(name);                           // fill the recovery-email box (admin can see it)
   }
 }
 
@@ -1271,29 +1360,38 @@ async function saveEditPlayer(oldName) {
       data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
     showMessage('Player already exists!', 'error'); return;
   }
-  data.players = data.players.map(p => p.name === oldName ? { name: newName, lang: newLang } : p);
+  const player = data.players.find(p => p.name === oldName);
+  if (newPass) {                                   // admin sets a new password = brand new login
+    try { await createLogin(player, newPass); }
+    catch(e) { showMessage('Could not set password: ' + e.code, 'error'); return; }
+  }
+  // only touch the email if its box was loaded (never wipe it by accident)
+  if (player.pid && editEmailDraft[oldName] !== undefined) await writeEmail(player.pid, editEmailDraft[oldName].trim());
+  delete editEmailDraft[oldName];
+  data.players = data.players.map(p => p.name === oldName ? { ...p, name: newName, lang: newLang } : p);
   data.matches = data.matches.map(m => ({
     ...m,
     winner: m.winner === oldName ? newName : m.winner,
     loser:  m.loser  === oldName ? newName : m.loser
   }));
-  if (newName !== oldName) { playerPasswords[newName] = playerPasswords[oldName]; delete playerPasswords[oldName]; }
-  if (newPass) { playerPasswords[newName || oldName] = newPass; }
   await save();
-  await setDoc(playersAuthRef, playerPasswords);
   editingPlayer = null;
   showMessage('Player updated!', 'success');
 }
 
 async function changePassword() {
-  const np = document.getElementById('new-password').value;
-  const cp = document.getElementById('confirm-password').value;
+  const cur = document.getElementById('current-password').value;
+  const np  = document.getElementById('new-password').value;
+  const cp  = document.getElementById('confirm-password').value;
+  if (!cur)      { showMessage('Please enter your current password!', 'error'); return; }
   if (!np)       { showMessage('Please enter a new password!', 'error'); return; }
   if (np !== cp) { showMessage('Passwords do not match!', 'error'); return; }
-  playerPasswords[currentPlayer] = np;
-  await setDoc(playersAuthRef, playerPasswords);
-  document.getElementById('new-password').value     = '';
-  document.getElementById('confirm-password').value = '';
+  try {
+    const user = auth.currentUser;
+    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, pad(cur)));
+    await updatePassword(user, pad(np));
+  } catch(e) { showMessage('Current password is wrong!', 'error'); return; }
+  ['current-password','new-password','confirm-password'].forEach(id => document.getElementById(id).value = '');
   showMessage('Password changed!', 'success');
 }
 
@@ -1392,8 +1490,8 @@ function setLangFilter(lang) {
   Rebuilds all visible UI from current state
 ---------------------------------------------------------- */
 function render() {
-  if (sessionStorage.getItem('isAdmin') === 'true') isAdmin = true;
-  if (sessionStorage.getItem('currentPlayer')) currentPlayer = sessionStorage.getItem('currentPlayer');
+  // Who is logged in comes from Firebase Auth (see 9.17); the name is looked up from the player id
+  if (currentPid) { const me = data.players.find(p => p.pid === currentPid); currentPlayer = me ? me.name : null; }
 
   const eloRatings = calculateAllElos();
   const maxElo     = Math.max(...Object.values(eloRatings), ELO_BASE);
@@ -1439,6 +1537,8 @@ function render() {
     logoutBtn.style.display = 'none';
     pendingBadge.style.display = 'none';
   }
+
+  renderResetRequests();
 
   /* --- Players tab visibility --- */
   document.getElementById('admin-locked').style.display   = isAdmin ? 'none' : (currentPlayer ? 'none' : 'block');
@@ -1851,6 +1951,7 @@ function render() {
           </div>
           <select id="edit-lang-${p.name}" style="margin-bottom:0">${catOptions}</select>
           <input type="password" id="edit-pass-${p.name}" placeholder="New password (leave blank to keep)" style="margin-bottom:0">
+          <input type="email" id="edit-email-${p.name}" value="${(editEmailDraft[p.name] || '').replace(/"/g, '&quot;')}" oninput="editEmailDraft['${p.name}'] = this.value" placeholder="Recovery email (optional, private)" style="margin-bottom:0">
         </div>`;
       }
       return `<div class="card">
@@ -1869,6 +1970,295 @@ function render() {
       </div>`;
     }).join('');
   }
+}
+
+/* ----------------------------------------------------------
+  9.17 Secure accounts
+  Logins now live in Firebase Authentication (passwords are hashed
+  by Google, never readable). Players still just pick their name
+  and type their password:
+    - behind the scenes each player has a hidden address like
+      <id>v1@gamestats.app, never shown to anyone
+    - the password is stored with a fixed prefix so short passwords
+      meet Firebase's 6-character minimum (players never see it)
+  9.17.1 Helpers
+  9.17.2 Auth state (who is logged in)
+  9.17.3 Admin tools: create login, migrate, delete old passwords
+  9.17.4 Recovery email (private)
+  9.17.5 Forgot password (admin approval or email link)
+---------------------------------------------------------- */
+
+/* 9.17.1 Helpers */
+const PW_PREFIX    = 'gamestats-';
+const ALIAS_DOMAIN = 'gamestats.app';
+const ADMIN_ALIAS  = 'admin@' + ALIAS_DOMAIN;
+function pad(pw)        { return PW_PREFIX + pw; }
+function newId()        { return crypto.randomUUID().replace(/-/g, '').slice(0, 16); }
+function aliasOf(pid, av) { return pid + 'v' + av + '@' + ALIAS_DOMAIN; }
+function aliasFor(p)    { return aliasOf(p.pid, p.av || 1); }
+function authError(e)   { return (e && e.code) ? e.code.replace('auth/', '') : 'error'; }
+
+/* 9.17.2 Auth state — restores the login after a page reload */
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { isAdmin = false; currentPid = null; currentPlayer = null; render(); return; }
+  try {
+    const adm = await getDoc(doc(db, 'admins', user.uid));
+    if (adm.exists()) { isAdmin = true; }
+    else {
+      const map = await getDoc(doc(db, 'authMap', user.uid));
+      if (map.exists()) { currentPid = map.data().pid; refreshMyEmail(); }
+    }
+  } catch(e) {}
+  autoApprovePreviousDays();
+  render();
+});
+
+/* 9.17.3 Admin tools */
+
+// 9.17.3.1 Create (or replace) the login of a player. The old login is switched off.
+async function createLogin(p, password) {
+  if (!p.pid) p.pid = newId();
+  let av = p.av || 0, uid = null;
+  for (let tries = 0; tries < 5 && !uid; tries++) {
+    av++;
+    try {
+      const cred = await createUserWithEmailAndPassword(tmpAuth, aliasOf(p.pid, av), pad(password));
+      uid = cred.user.uid;
+      await signOut(tmpAuth);
+    } catch(e) { if (authError(e) !== 'email-already-in-use') throw e; }   // alias taken: try the next one
+  }
+  if (!uid) throw new Error('could not create login');
+  const old = await getDoc(doc(db, 'playerAuth', p.pid));
+  if (old.exists()) await deleteDoc(doc(db, 'authMap', old.data().uid));  // old login stops working
+  await setDoc(doc(db, 'authMap', uid),           { pid: p.pid });
+  await setDoc(doc(db, 'playerAuth', p.pid),      { uid });
+  p.av = av;
+  return uid;
+}
+
+// 9.17.3.2 One-off: move every player's current password into Firebase Authentication
+async function migratePlayers() {
+  if (!isAdmin) return;
+  const status = document.getElementById('migration-status');
+  let legacy = {};
+  try { const snap = await getDoc(playersAuthRef); legacy = snap.exists() ? snap.data() : {}; }
+  catch(e) { status.textContent = 'Cannot read the old password list (already locked or deleted).'; return; }
+  let done = 0, skipped = [], failed = [];
+  for (const p of data.players) {
+    if (p.pid && p.av) continue;                       // already migrated
+    const pw = legacy[p.name];
+    if (!pw) { skipped.push(p.name); continue; }       // no old password known
+    try { await createLogin(p, pw); done++; status.textContent = 'Migrating... ' + done; }
+    catch(e) { failed.push(p.name + ' (' + authError(e) + ')'); }
+  }
+  await save();
+  status.textContent = 'Migrated: ' + done +
+    (skipped.length ? ' · no old password: ' + skipped.join(', ') : '') +
+    (failed.length  ? ' · failed: ' + failed.join(', ') : '');
+  showMessage('Migration finished', failed.length ? 'error' : 'success');
+}
+
+// 9.17.3.3 After checking that logins work: remove the plain-text passwords for good
+async function deleteLegacyPasswords() {
+  if (!isAdmin) return;
+  if (!confirm('Delete the old plain-text passwords? Make sure players can log in first!')) return;
+  try {
+    await deleteDoc(playersAuthRef);
+    await deleteDoc(adminRef);
+    document.getElementById('migration-status').textContent = 'Old passwords deleted ✅';
+    showMessage('Old passwords deleted', 'success');
+  } catch(e) { showMessage('Could not delete: ' + authError(e), 'error'); }
+}
+
+/* 9.17.4 Recovery email (private: only the owner and the admin can read it) */
+async function writeEmail(pid, email) {
+  if (!email) { await deleteDoc(doc(db, 'playerEmails', pid)); return; }
+  await setDoc(doc(db, 'playerEmails', pid), { email: email.toLowerCase() });
+}
+async function refreshMyEmail() {
+  if (!currentPid) return;
+  try {
+    const snap = await getDoc(doc(db, 'playerEmails', currentPid));
+    myEmail = snap.exists() ? snap.data().email : '';
+    const el = document.getElementById('my-email');
+    if (el) el.value = myEmail;
+  } catch(e) {}
+}
+async function saveMyEmail() {
+  const email = document.getElementById('my-email').value.trim();
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) { showMessage('That does not look like an email!', 'error'); return; }
+  try {
+    await writeEmail(currentPid, email);
+    myEmail = email.toLowerCase();
+    showMessage(email ? 'Recovery email saved ✅' : 'Recovery email removed', 'success');
+  } catch(e) { showMessage('Could not save email', 'error'); }
+}
+async function loadEditEmail(name) {                    // admin edit panel
+  const p = data.players.find(x => x.name === name);
+  if (!p || !p.pid) return;
+  try {
+    const snap = await getDoc(doc(db, 'playerEmails', p.pid));
+    editEmailDraft[name] = snap.exists() ? snap.data().email : '';
+    const el = document.getElementById('edit-email-' + name);
+    if (el) el.value = editEmailDraft[name];
+  } catch(e) {}
+}
+
+/* 9.17.5 Forgot password */
+let resetUnsub = null;
+
+async function ensureResetUser() {                      // a throw-away anonymous identity kept in this browser
+  if (!resetAuth.currentUser) await signInAnonymously(resetAuth);
+  return resetAuth.currentUser;
+}
+function requestCode(uid) { return uid.slice(0, 4).toUpperCase(); }
+
+function showResetModal(pid) {
+  hidePlayerLogin();
+  const sel = document.getElementById('reset-select');
+  sel.innerHTML = '<option value="">Select player...</option>' +
+    data.players.filter(p => p.pid).map(p => `<option value="${p.pid}">${p.name}</option>`).join('');
+  if (pid) sel.value = pid;
+  document.getElementById('reset-overlay').style.display = 'flex';
+  refreshResetState();
+}
+function hideResetModal() {
+  if (resetUnsub) { resetUnsub(); resetUnsub = null; }
+  document.getElementById('reset-overlay').style.display = 'none';
+}
+
+// Shows the right screen for the selected player: choose method / waiting / new password
+async function refreshResetState() {
+  const pid  = document.getElementById('reset-select').value;
+  const body = document.getElementById('reset-body');
+  if (resetUnsub) { resetUnsub(); resetUnsub = null; }
+  if (!pid) { body.innerHTML = ''; return; }
+  const user = await ensureResetUser();
+  resetUnsub = onSnapshot(doc(resetDb, 'resets', pid), (snap) => {
+    const r = snap.exists() ? snap.data() : null;
+    if (r && r.status === 'approved' && r.requesterUid === user.uid) {
+      body.innerHTML = `<p style="color:#4ade80;font-size:13px">✅ Approved! Choose a new password.</p>
+        <label>New password</label>
+        <input type="password" id="reset-new-1" style="margin-bottom:10px">
+        <label>Confirm new password</label>
+        <input type="password" id="reset-new-2" style="margin-bottom:12px">
+        <button class="btn" onclick="completeReset()">Set new password</button>`;
+    } else if (r && r.status === 'pending' && r.requesterUid === user.uid) {
+      body.innerHTML = `<p style="font-size:13px">⏳ Waiting for the admin. Tell them your code:</p>
+        <p style="font-size:28px;font-weight:800;letter-spacing:4px;text-align:center">${requestCode(user.uid)}</p>
+        <p style="color:#94a3b8;font-size:12px">Keep this window open or come back later on this same device.</p>`;
+    } else {
+      body.innerHTML = `<p style="color:#94a3b8;font-size:12px;margin:0 0 6px">Option 1 – email me a link (only if you linked an email in My Account)</p>
+        <input type="email" id="reset-email" placeholder="your email..." style="margin-bottom:8px">
+        <button class="btn" onclick="sendResetLink()">Email me a link</button>
+        <p style="color:#94a3b8;font-size:12px;margin:12px 0 6px">Option 2 – ask the admin to approve</p>
+        <button class="btn-outline" onclick="requestAdminReset()">Ask the admin</button>`;
+    }
+  }, () => {});
+}
+
+async function requestAdminReset() {
+  const pid = document.getElementById('reset-select').value;
+  try {
+    const user = await ensureResetUser();
+    await setDoc(doc(resetDb, 'resets', pid), { status: 'pending', requesterUid: user.uid, createdAt: Date.now() });
+  } catch(e) { showMessage('Someone already has an approved reset open for this player. Ask the admin.', 'error'); }
+}
+
+async function sendResetLink() {
+  const pid   = document.getElementById('reset-select').value;
+  const email = document.getElementById('reset-email').value.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) { showMessage('Enter the email you linked!', 'error'); return; }
+  try {
+    localStorage.setItem('gsReset', JSON.stringify({ pid, email }));
+    await sendSignInLinkToEmail(resetAuth, email, { url: location.origin + location.pathname, handleCodeInApp: true });
+    showMessage('If that email is linked, a link is on its way 📧', 'success');
+  } catch(e) { showMessage('Could not send the email: ' + authError(e), 'error'); }
+}
+
+// Runs when the page is opened from the email link: proves the email, which approves the reset
+async function handleEmailLink() {
+  if (!isSignInWithEmailLink(resetAuth, location.href)) return;
+  await dataReady;                                      // need the player list
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('gsReset') || '{}'); } catch(e) {}
+  let email = saved.email, pid = saved.pid;
+  if (!email) email = (prompt('Please type the email the link was sent to:') || '').trim().toLowerCase();
+  if (!pid) {
+    // Link opened in a different browser: ask which player this is (names come from the public list)
+    const names = data.players.filter(p => p.pid).map((p, i) => (i + 1) + ') ' + p.name).join('\n');
+    const n = parseInt(prompt('Which player are you? Type the number:\n' + names), 10);
+    const chosen = data.players.filter(p => p.pid)[n - 1];
+    pid = chosen && chosen.pid;
+  }
+  try {
+    if (!email || !pid) throw new Error('missing');
+    await signInWithEmailLink(proofAuth, email, location.href);        // proves the email is really yours
+    const user = await ensureResetUser();
+    await setDoc(doc(proofDb, 'resets', pid), { status: 'approved', requesterUid: user.uid, createdAt: Date.now() });
+    await signOut(proofAuth);
+    history.replaceState(null, '', location.pathname);
+    localStorage.removeItem('gsReset');
+    showResetModal(pid);
+  } catch(e) {
+    history.replaceState(null, '', location.pathname);
+    showMessage('That email is not linked to this player, or the link expired.', 'error');
+  }
+}
+
+// Last step: choose the new password, then log in normally
+async function completeReset() {
+  const pid = document.getElementById('reset-select').value;
+  const pw1 = document.getElementById('reset-new-1').value;
+  const pw2 = document.getElementById('reset-new-2').value;
+  if (pw1.length < 4) { showMessage('Use at least 4 characters!', 'error'); return; }
+  if (pw1 !== pw2)    { showMessage('Passwords do not match!', 'error'); return; }
+  const user = resetAuth.currentUser;
+  try {
+    // 1. fresh data (so we do not overwrite anybody's newest match)
+    const snap = await getDoc(doc(resetDb, 'gamestats', 'data'));
+    const d    = snap.data();
+    const p    = d.players.find(x => x.pid === pid);
+    const av   = (p.av || 1) + 1;
+    // 2. turn the anonymous identity into the player's new login (same uid)
+    await linkWithCredential(user, EmailAuthProvider.credential(aliasOf(pid, av), pad(pw1)));
+    // 3. take over the player: map the new login, then switch off the old one
+    const old = await getDoc(doc(resetDb, 'playerAuth', pid));
+    await setDoc(doc(resetDb, 'authMap', user.uid), { pid });
+    await setDoc(doc(resetDb, 'playerAuth', pid), { uid: user.uid });
+    p.av = av;
+    await setDoc(doc(resetDb, 'gamestats', 'data'), { players: d.players, matches: d.matches });
+    if (old.exists()) await deleteDoc(doc(resetDb, 'authMap', old.data().uid));
+    await deleteDoc(doc(resetDb, 'resets', pid));
+    await signOut(resetAuth);
+    // 4. log in on the main session like a normal login
+    hideResetModal();
+    document.getElementById('player-login-select').value = p.name;
+    await signInWithEmailAndPassword(auth, aliasOf(pid, av), pad(pw1));
+    currentPid = pid;
+    showMessage('New password set. Welcome ' + p.name + '! 👋', 'success');
+  } catch(e) { showMessage('Could not reset: ' + authError(e), 'error'); }
+}
+
+// Admin: approve or deny a request (the code must match what the player sees)
+async function approveReset(pid) { await updateDoc(doc(db, 'resets', pid), { status: 'approved' }); }
+async function denyReset(pid)    { await deleteDoc(doc(db, 'resets', pid)); }
+
+function renderResetRequests() {
+  const el = document.getElementById('reset-requests');
+  if (!el) return;
+  const items = Object.entries(resetRequests);
+  if (items.length === 0) { el.innerHTML = '<div style="color:#64748b;font-size:13px">No requests.</div>'; return; }
+  el.innerHTML = items.map(([pid, r]) => {
+    const p = data.players.find(x => x.pid === pid);
+    return `<div class="card"><div class="row">
+      <span><strong>${p ? p.name : pid}</strong> · code <strong>${requestCode(r.requesterUid)}</strong>
+        <span style="color:#94a3b8;font-size:12px">${r.status}</span></span>
+      <div class="btn-actions">
+        ${r.status === 'pending' ? `<button class="btn-act btn-act-confirm" onclick="approveReset('${pid}')">✅ Approve</button>` : ''}
+        <button class="btn-act btn-act-delete" onclick="denyReset('${pid}')">🗑️</button>
+      </div></div></div>`;
+  }).join('');
 }
 
 /* ----------------------------------------------------------
@@ -1922,8 +2312,21 @@ window.deleteCategory         = deleteCategory;
 window.closeEditCategoryModal = closeEditCategoryModal;
 window.toggleCatTypeInputs    = toggleCatTypeInputs;
 window.toggleEditCatInputs    = toggleEditCatInputs;
+window.editEmailDraft         = editEmailDraft;
+window.migratePlayers         = migratePlayers;
+window.deleteLegacyPasswords  = deleteLegacyPasswords;
+window.saveMyEmail            = saveMyEmail;
+window.showResetModal         = showResetModal;
+window.hideResetModal         = hideResetModal;
+window.refreshResetState      = refreshResetState;
+window.requestAdminReset      = requestAdminReset;
+window.sendResetLink          = sendResetLink;
+window.completeReset          = completeReset;
+window.approveReset           = approveReset;
+window.denyReset              = denyReset;
 
 render();
+handleEmailLink();      // opens the reset screen when the page was opened from an email link
 </script>
 </body>
 </html>

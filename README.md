@@ -50,10 +50,11 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 - Language team ELO rankings with average ELO per team
 
 ### 🔒 Security
-- Admin login stored securely in Firebase
-- Player passwords stored in Firebase
+- Logins use Firebase Authentication: passwords are hashed by Google and can never be read back
+- Players still just pick their name and type their password (a hidden login address is used behind the scenes)
+- Optional private recovery email lets players reset their own password; otherwise the admin approves a reset request
+- Firestore security rules: everyone can read stats, only logged-in players can save matches, only the admin can change settings
 - API key restricted to GitHub Pages domain only
-- Match confirmation system prevents false results
 
 ---
 
@@ -131,13 +132,17 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 ## Firebase Structure
 ```
 gamestats/
-  data        → players array and matches array
+  data        → players array (name, lang, pid, av) and matches array
   settings    → leaderboard settings (min matches threshold)
+  categories  → category list
 
-admin/
-  credentials       → admin username and password
-  playerPasswords   → each player's login password
+admins/<uid>          → marks the admin login (created by hand in the console)
+authMap/<uid>         → { pid }  which login belongs to which player
+playerAuth/<pid>      → { uid }  the player's current login
+playerEmails/<pid>    → { email } private recovery email (owner + admin only)
+resets/<pid>          → password reset request (pending / approved)
 ```
+Security rules live in `firestore.rules`; see `SETUP-GUIDE.md` for the upgrade steps.
 
 ---
 
@@ -147,7 +152,7 @@ If you want to run your own copy:
 
 1. Clone this repository
 2. Create a free Firebase project at [firebase.google.com](https://firebase.google.com)
-3. Enable Firestore database in test mode
+3. Enable Firestore, then publish the rules from `firestore.rules`
 4. Enable Google Analytics when setting up the project
 5. Register a web app and copy the config values
 6. Replace the Firebase config placeholders in `index.html`
