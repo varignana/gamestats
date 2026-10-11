@@ -313,23 +313,9 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
       <div id="admin-content" style="display:none">
 
-        <!-- Password reset requests + account migration -->
+        <!-- Password reset requests -->
         <div class="section-title">🔑 Password reset requests</div>
         <div id="reset-requests" style="margin-bottom:16px"></div>
-        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
-          <div class="section-title" style="font-size:14px;margin-bottom:6px">🔐 Secure logins</div>
-          <p style="color:#94a3b8;font-size:12px;margin:0 0 10px">One-off upgrade: moves everyone's current password into Firebase Authentication. Nobody has to change anything.</p>
-          <button class="btn-outline" onclick="migratePlayers()">1. Migrate players to secure logins</button>
-          <button class="btn-outline" onclick="deleteLegacyPasswords()">2. Delete old plain-text passwords</button>
-          <div id="migration-status" style="color:#94a3b8;font-size:12px;margin-top:8px"></div>
-        </div>
-        <!-- One-off: move the shared match list into one document per match -->
-        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
-          <div class="section-title" style="font-size:14px;margin-bottom:6px">🗂️ Separate match records</div>
-          <p style="color:#94a3b8;font-size:12px;margin:0 0 10px">One-off upgrade: copies every match into its own record so players can only change their own matches. A backup of the old list is kept. Safe to press again.</p>
-          <button class="btn-outline" onclick="migrateMatches()">3. Move matches to separate records</button>
-          <div id="match-migration-status" style="color:#94a3b8;font-size:12px;margin-top:8px"></div>
-        </div>
 
         <!-- Add Player -->
         <div class="section-title">Add Player</div>
@@ -540,8 +526,8 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.14 Tab switching & UI helpers
   9.15 Main render function
   9.16 Window exports
-  9.17 Secure accounts (Firebase Auth login, migration, reset, recovery email)
-  9.18 Separate match records (one-off migration + helpers)
+  9.17 Secure accounts (Firebase Auth login, reset, recovery email)
+  9.18 Match record helpers (used by Import and Reset)
 ============================================================ -->
 <script type="module">
 
@@ -551,7 +537,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
   getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
-  writeBatch, serverTimestamp, deleteField, Timestamp
+  writeBatch, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   initializeAuth, browserSessionPersistence, browserLocalPersistence, inMemoryPersistence,
@@ -596,11 +582,8 @@ const proofDb   = getFirestore(proofApp);
 const dataRef        = doc(db, 'gamestats', 'data');
 const settingsRef    = doc(db, 'gamestats', 'settings');
 const categoriesRef  = doc(db, 'gamestats', 'categories');  // NEW — stores categories
-const adminRef       = doc(db, 'admin', 'credentials');
 const matchesCol     = collection(db, 'matches');              // one document per match
 const loginsCol      = collection(db, 'logins');               // logins/<pid> = { av }
-const legacyBackupRef= doc(db, 'gamestats', 'legacyMatches');  // safety copy made by the migration
-const playersAuthRef = doc(db, 'admin', 'playerPasswords');
 
 logEvent(analytics, 'app_open');
 
@@ -642,7 +625,6 @@ let matchResult     = 'won';
 let eloInfoOpen     = false;
 let historyDayOffset= 0;
 let matchDocs       = [];     // matches as stored in matches/<id> (raw, before names are filled in)
-let legacyMatches   = [];     // the old single list inside gamestats/data (empty once migrated)
 let loginAvs        = {};     // pid -> login version, from logins/<pid>
 const autoTried     = new Set(); // matches this browser already tried to auto-confirm
 const DAY_MS        = 24 * 60 * 60 * 1000;
@@ -674,11 +656,10 @@ onSnapshot(categoriesRef, (snap) => {
   render();
 });
 
-// Data listener — the player list (and, until the migration has run, the old match list)
+// Data listener — the player list
 onSnapshot(dataRef, (snap) => {
   const d = snap.exists() ? snap.data() : {};
   data.players  = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
-  legacyMatches = d.matches || [];
   rebuildMatches();
   autoApprovePreviousDays();
   setSyncStatus('live');
@@ -709,12 +690,12 @@ onSnapshot(loginsCol, (snap) => {
   snap.forEach(d => { loginAvs[d.id] = d.data().av; });
 }, () => {});
 
-// Builds data.matches (oldest first, the order ELO is calculated in) from the two sources.
+// Builds data.matches (oldest first, the order ELO is calculated in) from the match documents.
 // Names are looked up from the player id, so a renamed player keeps all their matches
 // and nobody can fake a name inside a match.
 function rebuildMatches() {
   const nameOf = pid => { const p = data.players.find(x => x.pid && x.pid === pid); return p ? p.name : null; };
-  const live = [...matchDocs]
+  data.matches = [...matchDocs]
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
     .map(m => ({
       ...m,
@@ -722,11 +703,6 @@ function rebuildMatches() {
       loser:    nameOf(m.loserPid)  || m.loser,
       loggedBy: m.loggedByPid === 'admin' ? 'admin' : (nameOf(m.loggedByPid) || m.loggedBy)
     }));
-  // Before the migration: show the old list (read-only) plus anything logged since.
-  // The migration's own copies (ids 'legacy-…') are hidden until the old list is cleared.
-  data.matches = legacyMatches.length > 0
-    ? [...legacyMatches, ...live.filter(m => !m.id.startsWith('legacy-'))]
-    : live;
 }
 
 // Password reset requests (the admin panel shows them)
@@ -774,7 +750,7 @@ async function sync(task) {
   }
 }
 
-// Saves the player list (admin only). 'merge' leaves the old match list alone until the migration.
+// Saves the player list (admin only)
 async function savePlayers() {
   return sync(() => setDoc(dataRef, { players: data.players }, { merge: true }));
 }
@@ -1075,17 +1051,7 @@ async function attemptAdminLogin() {
   const username = document.getElementById('admin-username').value.trim();
   const password = document.getElementById('admin-password').value;
   try {
-    let cred;
-    try {
-      cred = await signInWithEmailAndPassword(auth, ADMIN_ALIAS, pad(password));
-    } catch (e) {
-      // First time after the upgrade: the secure admin account does not exist yet.
-      // Check the old credentials once (works only while the old database rules are still on).
-      const snap = await getDoc(adminRef);
-      if (!(snap.exists() && username === snap.data().username && password === snap.data().password)) throw e;
-      cred = await createUserWithEmailAndPassword(auth, ADMIN_ALIAS, pad(password));
-      await setDoc(doc(db, 'admins', cred.user.uid), { createdAt: Date.now() });
-    }
+    const cred = await signInWithEmailAndPassword(auth, ADMIN_ALIAS, pad(password));
     const ok = await getDoc(doc(db, 'admins', cred.user.uid));
     if (!ok.exists()) { await signOut(auth); showMessage('Wrong username or password!', 'error'); return; }
     isAdmin = true;
@@ -1472,9 +1438,6 @@ async function saveEditPlayer(oldName) {
   if (newName.toLowerCase() !== oldName.toLowerCase() &&
       data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
     showMessage('Player already exists!', 'error'); return;
-  }
-  if (newName !== oldName && legacyMatches.length > 0) {
-    showMessage('Press "3. Move matches to separate records" first, then rename.', 'error'); return;
   }
   const player = data.players.find(p => p.name === oldName);
   if (newPass) {                                   // admin sets a new password = brand new login
@@ -2010,12 +1973,11 @@ function render() {
       const isProvisional = m.status === 'provisional';
       const isDisputed    = m.status === 'disputed';
       const isMine        = !!(currentPid && m.loggedByPid === currentPid);   // I logged it
-      const canAct        = !!id;                            // old list (before migration) is read-only
       // Admin can change or delete anything. The player who logged a match can only correct it
       // while it is still waiting for the opponent; nobody but the admin can delete a match.
-      const canEdit       = canAct && (isAdmin || (isMine && isProvisional));
-      const canDelete     = canAct && isAdmin;
-      const isEditing     = canAct && editingMatch === id;
+      const canEdit       = (isAdmin || (isMine && isProvisional));
+      const canDelete     = isAdmin;
+      const isEditing     = editingMatch === id;
       const eloChange     = eloChanges[i];
 
       let statusBadge = '';
@@ -2045,8 +2007,8 @@ function render() {
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <span style="color:#475569;font-size:12px">${fmtDate(m.date)}</span>
             ${eloChange?`<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>`:''}
-            ${canAct&&isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch(${jsArg(id)})">🗑️</button>`:''}
-            ${canAct&&isProvisional&&currentPid&&m.loserPid===currentPid&&!isMine?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch(${jsArg(id)})">🚨</button>`:''}
+            ${isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch(${jsArg(id)})">🗑️</button>`:''}
+            ${isProvisional&&currentPid&&m.loserPid===currentPid&&!isMine?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch(${jsArg(id)})">🚨</button>`:''}
             ${canEdit&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch(${jsArg(id)})">✏️</button>`:''}
             ${canDelete&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="deleteMatch(${jsArg(id)})">🗑️</button>`:''}
           </div>
@@ -2110,7 +2072,7 @@ function render() {
       meet Firebase's 6-character minimum (players never see it)
   9.17.1 Helpers
   9.17.2 Auth state (who is logged in)
-  9.17.3 Admin tools: create login, migrate, delete old passwords
+  9.17.3 Admin tools: create login
   9.17.4 Recovery email (private)
   9.17.5 Forgot password (admin approval or email link)
 ---------------------------------------------------------- */
@@ -2162,40 +2124,6 @@ async function createLogin(p, password) {
   await setDoc(doc(db, 'logins', p.pid),          { av });
   p.av = av;
   return uid;
-}
-
-// 9.17.3.2 One-off: move every player's current password into Firebase Authentication
-async function migratePlayers() {
-  if (!isAdmin) return;
-  const status = document.getElementById('migration-status');
-  let legacy = {};
-  try { const snap = await getDoc(playersAuthRef); legacy = snap.exists() ? snap.data() : {}; }
-  catch(e) { status.textContent = 'Cannot read the old password list (already locked or deleted).'; return; }
-  let done = 0, skipped = [], failed = [];
-  for (const p of data.players) {
-    if (p.pid && p.av) continue;                       // already migrated
-    const pw = legacy[p.name];
-    if (!pw) { skipped.push(p.name); continue; }       // no old password known
-    try { await createLogin(p, pw); done++; status.textContent = 'Migrating... ' + done; }
-    catch(e) { failed.push(p.name + ' (' + authError(e) + ')'); }
-  }
-  await savePlayers();
-  status.textContent = 'Migrated: ' + done +
-    (skipped.length ? ' · no old password: ' + skipped.join(', ') : '') +
-    (failed.length  ? ' · failed: ' + failed.join(', ') : '');
-  showMessage('Migration finished', failed.length ? 'error' : 'success');
-}
-
-// 9.17.3.3 After checking that logins work: remove the plain-text passwords for good
-async function deleteLegacyPasswords() {
-  if (!isAdmin) return;
-  if (!confirm('Delete the old plain-text passwords? Make sure players can log in first!')) return;
-  try {
-    await deleteDoc(playersAuthRef);
-    await deleteDoc(adminRef);
-    document.getElementById('migration-status').textContent = 'Old passwords deleted ✅';
-    showMessage('Old passwords deleted', 'success');
-  } catch(e) { showMessage('Could not delete: ' + authError(e), 'error'); }
 }
 
 /* 9.17.4 Recovery email (private: only the owner and the admin can read it) */
@@ -2388,17 +2316,14 @@ function renderResetRequests() {
 }
 
 /* ----------------------------------------------------------
-  9.18 Separate match records (one-off migration + helpers)
-  Before: every match lived in one shared list inside gamestats/data,
-  so any logged-in player could rewrite all of them.
-  After: each match is its own document in matches/<id>, and the
+  9.18 Match record helpers (used by Import and Reset)
+  Each match is its own document in matches/<id>, and the
   database rules decide per match who may change it.
-  9.18.1 Convert a list of old-style matches into documents
+  9.18.1 Convert an exported match list into documents
   9.18.2 Batch helpers (write / delete many documents)
-  9.18.3 The migration button
 ---------------------------------------------------------- */
 
-// 9.18.1 Old-style list -> documents. Used by the migration and by Import.
+// 9.18.1 Exported list -> documents. Used by Import.
 //        - player ids are looked up from the names (or kept, if the list already has them)
 //        - createdAt is a tiny made-up time (1970 + position) so old matches always come
 //          first and in their original order: that order decides the ELO ratings
@@ -2426,8 +2351,8 @@ function toMatchDocs(list, players) {
       pendingSince: typeof m.pendingSince === 'number' ? Timestamp.fromMillis(m.pendingSince) : now
     };
     if (m.disputedBy) d.disputedBy = m.disputedBy;
-    // fixed ids: pressing the migration twice overwrites the same records instead of doubling them
-    return { id: 'legacy-' + String(i).padStart(5, '0'), data: d };
+    // fixed ids keep the imported order stable
+    return { id: 'imp-' + String(i).padStart(5, '0'), data: d };
   });
 }
 
@@ -2453,53 +2378,6 @@ async function writeLoginDocs(players) {
   const batch = writeBatch(db);
   players.filter(p => p.pid).forEach(p => batch.set(doc(db, 'logins', p.pid), { av: loginAvs[p.pid] || p.av || 0 }));
   await batch.commit();
-}
-
-// 9.18.3 Migration: run once by the admin after uploading this version
-async function migrateMatches() {
-  if (!isAdmin) return;
-  const status = document.getElementById('match-migration-status');
-  const say    = t => { status.textContent = t; };
-  try {
-    // 1. Read the old list fresh from the database
-    const snap    = await getDoc(dataRef);
-    const d       = snap.exists() ? snap.data() : {};
-    const old     = d.matches || [];
-    const players = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
-    if (old.length === 0) { say('Nothing to move: matches already live in separate records ✅'); return; }
-    if (!confirm('Move ' + old.length + ' matches into separate records? A backup of the old list is kept.')) return;
-
-    // 2. Safety copy of the old list (admin-only document gamestats/legacyMatches)
-    say('1/5 Saving a backup...');
-    await setDoc(legacyBackupRef, { matches: old, players, savedAt: Date.now() });
-
-    // 3. Every player needs a permanent id, because matches now point to ids, not names
-    say('2/5 Checking player ids...');
-    players.forEach(p => { if (!p.pid) p.pid = newId(); });
-    await updateDoc(dataRef, { players });
-    await writeLoginDocs(players);
-
-    // 4. One document per match
-    say('3/5 Copying ' + old.length + ' matches...');
-    const docs = toMatchDocs(old, players);
-    await writeMatchDocs(docs);
-
-    // 5. Check that every copy arrived before touching the old list
-    say('4/5 Checking the copies...');
-    const check   = await getDocs(matchesCol);
-    const have    = new Set(check.docs.map(x => x.id));
-    const missing = docs.filter(x => !have.has(x.id)).length;
-    if (missing > 0) { say('Stopped: ' + missing + ' matches were not copied. The old list is untouched, press again.'); return; }
-
-    // 6. Remove the old list from the shared document (the backup stays)
-    say('5/5 Removing the old shared list...');
-    await updateDoc(dataRef, { matches: deleteField() });
-    say('Done ✅ ' + docs.length + ' matches moved. Backup kept in gamestats/legacyMatches.');
-    showMessage('Matches moved ✅', 'success');
-  } catch(e) {
-    console.warn('Match migration failed:', e.code || e.message);
-    say('Failed: ' + (e.code || e.message) + '. Nothing was lost; the old list is only removed at the very end.');
-  }
 }
 
 /* ----------------------------------------------------------
@@ -2554,9 +2432,6 @@ window.closeEditCategoryModal = closeEditCategoryModal;
 window.toggleCatTypeInputs    = toggleCatTypeInputs;
 window.toggleEditCatInputs    = toggleEditCatInputs;
 window.editEmailDraft         = editEmailDraft;
-window.migratePlayers         = migratePlayers;
-window.deleteLegacyPasswords  = deleteLegacyPasswords;
-window.migrateMatches         = migrateMatches;
 window.saveMyEmail            = saveMyEmail;
 window.showResetModal         = showResetModal;
 window.hideResetModal         = hideResetModal;

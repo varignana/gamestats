@@ -58,6 +58,7 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 - A logged win stays provisional until the opponent confirms; undisputed matches confirm themselves after 24 hours (checked with the server's clock)
 - Every player name, category label and database id is escaped before it is put into the page, so a name containing HTML or script code is shown as plain text and never runs
 - Match dates are stored as `YYYY-MM-DD`, identical on every phone whatever its language or region settings
+- No plain-text passwords are stored anywhere: the old `admin/` documents were removed
 - Firestore security rules: everyone can read stats, only the admin can change players, settings and categories
 - API key restricted to GitHub Pages domain only
 
@@ -84,7 +85,7 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 2. Add players, set passwords, manage all data
 3. Admin matches are confirmed instantly
 4. Confirm or reject any pending match in History
-5. Export data as JSON backup anytime
+5. Export data as JSON backup anytime (📤 Export Data in the Players tab)
 
 ---
 
@@ -137,10 +138,9 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 ## Firebase Structure
 ```
 gamestats/
-  data           → players array (name, lang, pid, av)
+  data           → players array (name, lang, pid, av). Admin writes only.
   settings       → leaderboard settings (min matches threshold)
   categories     → category list
-  legacyMatches  → backup of the old single match list (admin only)
 
 matches/<id>          → one match: winner, loser, winnerPid, loserPid, date (YYYY-MM-DD), loggedBy,
                         loggedByPid, status, disputedBy, createdAt, pendingSince
@@ -152,7 +152,8 @@ playerAuth/<pid>      → { uid }  the player's current login
 playerEmails/<pid>    → { email } private recovery email (owner + admin only)
 resets/<pid>          → password reset request (pending / approved)
 ```
-Security rules live in `firestore.rules`; see `SETUP-GUIDE.md` for the upgrade steps.
+Anything not listed here is closed by `firestore.rules`: the app can neither read nor write it.
+`SETUP-GUIDE.md` has the steps to deploy this version and to delete the obsolete data left by earlier versions.
 
 ---
 
@@ -162,13 +163,16 @@ If you want to run your own copy:
 
 1. Clone this repository
 2. Create a free Firebase project at [firebase.google.com](https://firebase.google.com)
-3. Enable Firestore, then publish the rules from `firestore.rules`
-4. Enable Google Analytics when setting up the project
-5. Register a web app and copy the config values
-6. Replace the Firebase config placeholders in `index.html`
-7. In Firestore create collection `admin` → document `credentials` with fields `username` and `password`
-8. Restrict your API key to your domain in Google Cloud Console
-9. Host on GitHub Pages or any static hosting
+3. Enable **Firestore** and publish the rules from `firestore.rules`
+4. Enable **Authentication → Sign-in method → Email/Password** (and **Email link** if you want self-service password reset), and add your site's domain under *Authentication → Settings → Authorized domains*
+5. Enable Google Analytics when setting up the project
+6. Register a web app and copy the config values
+7. Replace the Firebase config placeholders in `index.html`
+8. Create the admin login: *Authentication → Users → Add user* with email `admin@gamestats.app` and password `gamestats-` followed by the password you want (for example `gamestats-mysecret` means you type `mysecret` in the app). Copy the new user's **User UID**
+9. In Firestore create collection `admins` → document id = that User UID (add any field, for example `createdAt` = a number)
+10. Restrict your API key to your domain in Google Cloud Console
+11. Host on GitHub Pages or any static hosting
+12. Log in as admin → Players tab → add your players (each gets a secure login)
 
 ---
 
@@ -189,6 +193,8 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 - [x] Firebase Authentication for proper user management
 - [x] One database record per match
+- [x] Admin-only delete, escaped player names, ISO dates
+- [x] Legacy migration tools and plain-text passwords removed
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
 - [ ] Tournament bracket mode
