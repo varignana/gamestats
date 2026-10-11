@@ -802,18 +802,18 @@ function getCategoryBadge(code) {
   const cat = getCategoryObj(code);
   if (!cat) return '';
   if (cat.type === 'emoji') {
-    return `<span style="font-size:16px;margin-right:4px;">${cat.value}</span>`;
+    return `<span style="font-size:16px;margin-right:4px;">${esc(cat.value)}</span>`;
   }
   // Flag
-  return `<img src="https://flagcdn.com/20x15/${cat.value}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${cat.label}">`;
+  return `<img src="https://flagcdn.com/20x15/${esc(cat.value)}.png" style="width:20px;height:15px;border-radius:2px;vertical-align:middle;margin-right:4px;" alt="${esc(cat.label)}">`;
 }
 
 // Get small badge for filter buttons
 function getCategoryBadgeSmall(cat) {
   if (cat.type === 'emoji') {
-    return `<span style="font-size:14px;margin-right:4px">${cat.value}</span>`;
+    return `<span style="font-size:14px;margin-right:4px">${esc(cat.value)}</span>`;
   }
-  return `<img src="https://flagcdn.com/20x15/${cat.value}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">`;
+  return `<img src="https://flagcdn.com/20x15/${esc(cat.value)}.png" style="width:16px;height:12px;border-radius:1px;vertical-align:middle;margin-right:4px;">`;
 }
 
 function getPlayerObj(name) { return data.players.find(p => p.name === name); }
@@ -893,20 +893,45 @@ function getPendingForPlayer(name) {
   return data.matches.filter(m => m.id && m.status === 'provisional' && m.loser === name);
 }
 
+// 9.4.1 Safe output. Everything a user can type (names, category labels, ids from the database)
+//       goes through one of these before it is put into the page as HTML.
+//       esc()    -> for text and normal attribute values: turns & < > " ' into harmless codes
+//       jsArg()  -> for a value inside an inline handler such as onclick="openH2H(...)":
+//                   gives a quoted JavaScript string, then escapes it for the HTML attribute
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function jsArg(s) { return esc(JSON.stringify(String(s ?? ''))); }
+
+// 9.4.2 Dates. A match date is stored as YYYY-MM-DD (the player's local day), the same on every
+//       phone whatever its language settings. Older matches still hold a text such as "11/10/2026"
+//       written in the logging phone's own format; those are shown as they are.
+function isoDate(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function fmtDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  return esc(m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString() : (s || ''));
+}
+// All the spellings a given day can have in the database: the new one, plus the old
+// device-format text (so matches logged before this version still show on the right day).
+function dateKeys(d) { return [isoDate(d), d.toLocaleDateString()]; }
+
 function getDisputedMatches() {
   return data.matches.filter(m => m.id && m.status === 'disputed');
 }
 
-function getDateForOffset(offset) {
+function dayForOffset(offset) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toLocaleDateString();
+  return d;
 }
 
 function getDateLabel(offset) {
   if (offset === 0)  return 'Today';
   if (offset === -1) return 'Yesterday';
-  return getDateForOffset(offset);
+  return dayForOffset(offset).toLocaleDateString();
 }
 
 /* ----------------------------------------------------------
@@ -1090,14 +1115,14 @@ function showAdminDisputedModal() {
   document.getElementById('admin-disputed-list').innerHTML = disputed.map(m => `
     <div class="approval-match-row">
       <div class="approval-match-text">
-        <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> beat
-        <span class="loss">${getPlayerBadge(m.loser)}${m.loser}</span>
-        <span style="color:#475569;font-size:12px;margin-left:6px">${m.date}</span>
-        <div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy || m.loser}</div>
+        <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+        <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
+        <span style="color:#475569;font-size:12px;margin-left:6px">${fmtDate(m.date)}</span>
+        <div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${esc(m.disputedBy || m.loser)}</div>
       </div>
       <div class="approval-match-actions">
-        <button class="btn-act btn-act-confirm" onclick="adminResolveDispute('${m.id}','confirm')">✅ Confirm</button>
-        <button class="btn-act btn-act-delete"  onclick="adminResolveDispute('${m.id}','delete')">🗑️ Delete</button>
+        <button class="btn-act btn-act-confirm" onclick="adminResolveDispute(${jsArg(m.id)},'confirm')">✅ Confirm</button>
+        <button class="btn-act btn-act-delete"  onclick="adminResolveDispute(${jsArg(m.id)},'delete')">🗑️ Delete</button>
       </div>
     </div>`).join('');
   document.getElementById('admin-disputed-overlay').style.display = 'flex';
@@ -1121,7 +1146,7 @@ async function adminResolveDispute(id, action) {
 function showPlayerLogin() {
   const select = document.getElementById('player-login-select');
   select.innerHTML = '<option value="">Select player...</option>' +
-    data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+    data.players.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
   document.getElementById('player-overlay').style.display = 'flex';
   setTimeout(() => select.focus(), 100);
 }
@@ -1171,13 +1196,13 @@ function showApprovalModal(playerName) {
   const pending = getPendingForPlayer(playerName);
   if (pending.length === 0) return;
   document.getElementById('approval-list').innerHTML = pending.map(m => `
-    <div class="approval-match-row" id="approval-row-${m.id}">
+    <div class="approval-match-row" id="approval-row-${esc(m.id)}">
       <div class="approval-match-text">
-        <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> says they beat you on <strong>${m.date}</strong>
+        <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> says they beat you on <strong>${fmtDate(m.date)}</strong>
       </div>
       <div class="approval-match-actions">
-        <button class="btn-act btn-act-confirm" onclick="approvalConfirm('${m.id}')">✅ Confirm</button>
-        <button class="btn-act btn-act-dispute" onclick="approvalDispute('${m.id}')">🚨 Dispute</button>
+        <button class="btn-act btn-act-confirm" onclick="approvalConfirm(${jsArg(m.id)})">✅ Confirm</button>
+        <button class="btn-act btn-act-dispute" onclick="approvalDispute(${jsArg(m.id)})">🚨 Dispute</button>
       </div>
     </div>`).join('');
   document.getElementById('approval-done-btn').style.display = 'none';
@@ -1239,11 +1264,12 @@ async function logMatch() {
     }
   }
 
-  const today      = new Date().toLocaleDateString();
+  const todayKeys  = dateKeys(new Date());
+  const today      = todayKeys[0];                       // stored as YYYY-MM-DD
   const duplicates = data.matches.filter(m =>
     m.status === 'provisional' &&
     ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
-    m.date === today
+    todayKeys.includes(m.date)
   );
   if (duplicates.length >= 3) { showMessage('Maximum 3 pending matches between same players per day!', 'error'); return; }
 
@@ -1290,8 +1316,8 @@ async function rejectMatch(id) {
     if (!confirm('Dispute this match? It will be sent to admin for review.')) return;
     if (await sync(() => updateDoc(matchRef(id), { status: 'disputed', disputedBy: currentPlayer })))
       showMessage('Match disputed — admin will review! 🚨', 'info');
-  } else {
-    // 2. Creator (or admin): delete
+  } else if (isAdmin) {
+    // 2. Admin: delete (the database rules only allow the admin to delete a match)
     if (!confirm('Delete this match?')) return;
     if (await sync(() => deleteDoc(matchRef(id)))) showMessage('Match deleted!', 'info');
   }
@@ -1341,11 +1367,11 @@ function openH2H(p1, p2) {
     : matches.map(m => {
         const isP1Win = m.winner === p1;
         return `<div class="match-history-item">
-          <span style="color:#94a3b8;font-size:12px">${m.date}</span>
+          <span style="color:#94a3b8;font-size:12px">${fmtDate(m.date)}</span>
           <span>
-            <span class="${isP1Win ? 'win' : 'loss'}">${getPlayerBadge(m.winner)}${m.winner}</span>
+            <span class="${isP1Win ? 'win' : 'loss'}">${getPlayerBadge(m.winner)}${esc(m.winner)}</span>
             beat
-            <span class="${isP1Win ? 'loss' : 'win'}">${getPlayerBadge(m.loser)}${m.loser}</span>
+            <span class="${isP1Win ? 'loss' : 'win'}">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
           </span>
           <span class="result-badge ${isP1Win ? 'result-win' : 'result-loss'}">${isP1Win ? 'W' : 'L'}</span>
         </div>`;
@@ -1354,12 +1380,12 @@ function openH2H(p1, p2) {
     <div class="h2h-header">
       <div class="h2h-header-names">
         <div class="h2h-header-player">
-          <span>${getPlayerBadge(p1)}${p1}</span>
+          <span>${getPlayerBadge(p1)}${esc(p1)}</span>
           <span style="color:#38bdf8;font-size:13px">ELO ${eloRatings[p1] || ELO_BASE}</span>
         </div>
         <div class="h2h-vs">VS</div>
         <div class="h2h-header-player">
-          <span>${getPlayerBadge(p2)}${p2}</span>
+          <span>${getPlayerBadge(p2)}${esc(p2)}</span>
           <span style="color:#38bdf8;font-size:13px">ELO ${eloRatings[p2] || ELO_BASE}</span>
         </div>
       </div>
@@ -1497,7 +1523,7 @@ function exportData() {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = 'gamestats_' + new Date().toLocaleDateString().replace(/\//g, '-') + '.json';
+  a.download = 'gamestats_' + isoDate(new Date()) + '.json';
   a.click();
   URL.revokeObjectURL(url);
   logEvent(analytics, 'data_exported');
@@ -1599,7 +1625,7 @@ function render() {
   const pendingBadge = document.getElementById('pending-badge');
 
   if (currentPlayer) {
-    topbarUser.innerHTML    = `${getPlayerBadge(currentPlayer)}<span>${currentPlayer}</span>`;
+    topbarUser.innerHTML    = `${getPlayerBadge(currentPlayer)}<span>${esc(currentPlayer)}</span>`;
     loginBtn.style.display  = 'none';
     logoutBtn.style.display = 'block';
     const pending = getPendingForPlayer(currentPlayer);
@@ -1645,7 +1671,7 @@ function render() {
   const newPlayerLangSel = document.getElementById('newPlayerLang');
   if (newPlayerLangSel) {
     newPlayerLangSel.innerHTML = '<option value="">No category</option>' +
-      categories.map(c => `<option value="${c.code}">${c.type === 'emoji' ? c.value : '🏳️'} ${c.label}</option>`).join('');
+      categories.map(c => `<option value="${esc(c.code)}">${c.type === 'emoji' ? esc(c.value) : '🏳️'} ${esc(c.label)}</option>`).join('');
   }
 
   /* --- Category list in admin panel --- */
@@ -1662,12 +1688,12 @@ function render() {
           <div class="row">
             <div style="display:flex;align-items:center;gap:8px">
               ${badge}
-              <span style="font-weight:700">${c.label}</span>
+              <span style="font-weight:700">${esc(c.label)}</span>
               <span style="color:#64748b;font-size:12px">${playersInCat} player${playersInCat !== 1 ? 's' : ''}</span>
             </div>
             <div class="btn-actions">
-              <button class="btn-act btn-act-edit" onclick="editCategory('${c.code}')">✏️ Edit</button>
-              <button class="btn-act btn-act-delete" onclick="deleteCategory('${c.code}')" ${!canDelete ? 'style="opacity:0.3;cursor:not-allowed"' : ''} ${!canDelete ? 'disabled' : ''}>🗑️</button>
+              <button class="btn-act btn-act-edit" onclick="editCategory(${jsArg(c.code)})">✏️ Edit</button>
+              <button class="btn-act btn-act-delete" onclick="deleteCategory(${jsArg(c.code)})" ${!canDelete ? 'style="opacity:0.3;cursor:not-allowed"' : ''} ${!canDelete ? 'disabled' : ''}>🗑️</button>
             </div>
           </div>
         </div>`;
@@ -1687,13 +1713,13 @@ function render() {
     document.getElementById('log-as-name').textContent = isAdmin ? 'Admin (can log any match)' : currentPlayer;
     if (isAdmin) {
       logPlayerForm.style.display = 'none'; logAdminForm.style.display = 'block';
-      const opts = data.players.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+      const opts = data.players.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
       document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + opts;
       document.getElementById('loser').innerHTML  = '<option value="">Select loser...</option>'  + opts;
     } else {
       logPlayerForm.style.display = 'block'; logAdminForm.style.display = 'none';
       const opts = data.players.filter(p => p.name !== currentPlayer)
-        .map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+        .map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
       document.getElementById('opponent').innerHTML = '<option value="">Select opponent...</option>' + opts;
     }
   }
@@ -1703,7 +1729,7 @@ function render() {
   const currentOddsSelection = oddsSelect.value;
   oddsSelect.innerHTML = '<option value="">Select player...</option>' +
     [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE))
-      .map(p => `<option value="${p.name}" ${p.name === currentOddsSelection ? 'selected' : ''}>${p.name} (ELO ${eloRatings[p.name]||ELO_BASE})</option>`).join('');
+      .map(p => `<option value="${esc(p.name)}" ${p.name === currentOddsSelection ? 'selected' : ''}>${esc(p.name)} (ELO ${eloRatings[p.name]||ELO_BASE})</option>`).join('');
   if (!oddsSelect.value) {
     if (currentPlayer) oddsSelect.value = currentPlayer;
     else if (data.players.length > 0)
@@ -1715,7 +1741,7 @@ function render() {
   if (selectedOddsPlayer) {
     const playerElo = eloRatings[selectedOddsPlayer] || ELO_BASE;
     oddsPlayerInfo.style.display = 'flex';
-    document.getElementById('odds-player-name').innerHTML  = `${getPlayerBadge(selectedOddsPlayer)}${selectedOddsPlayer}`;
+    document.getElementById('odds-player-name').innerHTML  = `${getPlayerBadge(selectedOddsPlayer)}${esc(selectedOddsPlayer)}`;
     document.getElementById('odds-player-elo').textContent = `ELO ${playerElo}`;
     const opponents = data.players.filter(p => p.name !== selectedOddsPlayer)
       .map(p => {
@@ -1731,7 +1757,7 @@ function render() {
         <div class="odds-row-top">
           <div class="odds-name">
             <span class="odds-difficulty ${difficulty}"></span>
-            ${getPlayerBadge(op.name)}${op.name}
+            ${getPlayerBadge(op.name)}${esc(op.name)}
             <span style="color:#64748b;font-size:12px">ELO ${op.oppElo}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
@@ -1758,8 +1784,8 @@ function render() {
   const usedCodes = new Set(data.players.map(p => p.lang).filter(Boolean));
   const allBtn    = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
   const catBtns   = categories.filter(c => usedCodes.has(c.code)).map(c =>
-    `<button class="lang-btn ${activeLang === c.code ? 'active' : ''}" onclick="setLangFilter('${c.code}')">
-      ${getCategoryBadgeSmall(c)}${c.label}
+    `<button class="lang-btn ${activeLang === c.code ? 'active' : ''}" onclick="setLangFilter(${jsArg(c.code)})">
+      ${getCategoryBadgeSmall(c)}${esc(c.label)}
     </button>`
   ).join('');
   lf.innerHTML = allBtn + catBtns;
@@ -1794,8 +1820,8 @@ function render() {
           .filter(op => op.total > 0).sort((a,b) => b.total - a.total);
         const opponentsHTML = opponents.length === 0
           ? '<div style="color:#475569;font-size:13px;text-align:center;padding:8px">No matches yet</div>'
-          : opponents.map(op => `<div class="h2h-opponent-row" onclick="openH2H('${p.name}','${op.name}')">
-              <div class="h2h-opponent-name">${getPlayerBadge(op.name)}${op.name} <span style="color:#475569;font-size:11px">↗</span></div>
+          : opponents.map(op => `<div class="h2h-opponent-row" onclick="openH2H(${jsArg(p.name)},${jsArg(op.name)})">
+              <div class="h2h-opponent-name">${getPlayerBadge(op.name)}${esc(op.name)} <span style="color:#475569;font-size:11px">↗</span></div>
               <div class="h2h-opponent-stats">
                 <span class="win">${op.p1wins}W</span>
                 <span class="loss">${op.p2wins}L</span>
@@ -1808,11 +1834,11 @@ function render() {
           ${opponentsHTML}
         </div>`;
       }
-      return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer('${p.name}')">
+      return `<div class="card clickable ${isSelected ? 'selected' : ''}" onclick="togglePlayer(${jsArg(p.name)})">
         <div class="row">
           <div style="display:flex;align-items:center">
             <span class="medal">${medals[i]||(i+1)+'.'}</span>
-            <span style="font-weight:700;font-size:16px">${getPlayerBadge(p.name)}${p.name}</span>
+            <span style="font-weight:700;font-size:16px">${getPlayerBadge(p.name)}${esc(p.name)}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="elo-badge">ELO ${elo}</span>
@@ -1836,7 +1862,7 @@ function render() {
           <div class="row">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="unranked">—</span>
-              <span style="font-weight:700">${getPlayerBadge(p.name)}${p.name}</span>
+              <span style="font-weight:700">${getPlayerBadge(p.name)}${esc(p.name)}</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <span class="elo-badge">ELO ${elo}</span>
@@ -1877,7 +1903,7 @@ function render() {
               <span style="font-size:16px">${teamMedals[i]||(i+1)+'.'}</span>
               ${getCategoryBadge(t.code)}
               <div>
-                <div style="font-weight:700;font-size:14px">${t.label}</div>
+                <div style="font-weight:700;font-size:14px">${esc(t.label)}</div>
                 <div style="color:#64748b;font-size:11px">${t.cPlayers.length} players · ${t.totalMatches} matches</div>
                 <div class="bar-bg" style="width:120px;margin-top:4px"><div class="bar-fill-elo" style="width:${barW}%"></div></div>
               </div>
@@ -1913,9 +1939,9 @@ function render() {
         <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${confirmedMatches.length}</div></div>
         <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
       </div>
-      ${mostActive?`<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getPlayerBadge(mostActive.name)}${mostActive.name}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name]||ELO_BASE}</div></div>`:''}
-      ${biggestRivalry?`<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H('${biggestRivalry.p1}','${biggestRivalry.p2}')"><div class="label">Biggest rivalry ↗</div><div class="value">${getPlayerBadge(biggestRivalry.p1)}${biggestRivalry.p1} vs ${getPlayerBadge(biggestRivalry.p2)}${biggestRivalry.p2}</div><div class="sub">${biggestRivalry.total} matches together</div></div>`:''}
-      ${bestStreak>0?`<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getPlayerBadge(bestStreakPlayer)}${bestStreakPlayer}</div><div class="sub">${bestStreak} wins in a row</div></div>`:''}
+      ${mostActive?`<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getPlayerBadge(mostActive.name)}${esc(mostActive.name)}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name]||ELO_BASE}</div></div>`:''}
+      ${biggestRivalry?`<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H(${jsArg(biggestRivalry.p1)},${jsArg(biggestRivalry.p2)})"><div class="label">Biggest rivalry ↗</div><div class="value">${getPlayerBadge(biggestRivalry.p1)}${esc(biggestRivalry.p1)} vs ${getPlayerBadge(biggestRivalry.p2)}${esc(biggestRivalry.p2)}</div><div class="sub">${biggestRivalry.total} matches together</div></div>`:''}
+      ${bestStreak>0?`<div class="gen-stat-card"><div class="label">Longest win streak</div><div class="value">${getPlayerBadge(bestStreakPlayer)}${esc(bestStreakPlayer)}</div><div class="sub">${bestStreak} wins in a row</div></div>`:''}
       `:''}
       ${teamEloHTML}`;
   }
@@ -1933,13 +1959,13 @@ function render() {
       pendingList.innerHTML = pending.map(m => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
           <span>
-            <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> beat
-            <span class="loss">${getPlayerBadge(m.loser)}${m.loser}</span>
-            <span style="color:#475569;font-size:12px;margin-left:4px">${m.date}</span>
+            <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+            <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
+            <span style="color:#475569;font-size:12px;margin-left:4px">${fmtDate(m.date)}</span>
           </span>
           <div class="btn-actions">
-            <button class="btn-act btn-act-confirm" onclick="confirmMatch('${m.id}')">✅ Confirm</button>
-            <button class="btn-act btn-act-dispute" onclick="rejectMatch('${m.id}')">🚨 Dispute</button>
+            <button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(m.id)})">✅ Confirm</button>
+            <button class="btn-act btn-act-dispute" onclick="rejectMatch(${jsArg(m.id)})">🚨 Dispute</button>
           </div>
         </div>`).join('');
     } else { pendingSection.style.display = 'none'; }
@@ -1952,27 +1978,28 @@ function render() {
       disputedList.innerHTML = disputed.map(m => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
           <span>
-            <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> beat
-            <span class="loss">${getPlayerBadge(m.loser)}${m.loser}</span>
-            <span style="color:#475569;font-size:12px;margin-left:4px">${m.date}</span>
-            <br><span style="color:#ef4444;font-size:11px">⚠️ Disputed by ${m.disputedBy||m.loser}</span>
+            <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+            <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
+            <span style="color:#475569;font-size:12px;margin-left:4px">${fmtDate(m.date)}</span>
+            <br><span style="color:#ef4444;font-size:11px">⚠️ Disputed by ${esc(m.disputedBy||m.loser)}</span>
           </span>
           <div class="btn-actions">
-            <button class="btn-act btn-act-confirm" onclick="adminResolveDispute('${m.id}','confirm')">✅ Confirm</button>
-            <button class="btn-act btn-act-delete"  onclick="adminResolveDispute('${m.id}','delete')">🗑️ Delete</button>
+            <button class="btn-act btn-act-confirm" onclick="adminResolveDispute(${jsArg(m.id)},'confirm')">✅ Confirm</button>
+            <button class="btn-act btn-act-delete"  onclick="adminResolveDispute(${jsArg(m.id)},'delete')">🗑️ Delete</button>
           </div>
         </div>`).join('');
     } else { disputedSection.style.display = 'none'; }
   } else { disputedSection.style.display = 'none'; }
 
   /* --- History navigation & match list --- */
-  const targetDate = getDateForOffset(historyDayOffset);
+  const targetDay  = dayForOffset(historyDayOffset);
+  const targetKeys = dateKeys(targetDay);
   document.getElementById('history-date-label').textContent   = getDateLabel(historyDayOffset);
   document.getElementById('history-next-btn').disabled        = historyDayOffset >= 0;
 
   const eloChanges = calculateEloChanges();
   const hl         = document.getElementById('history-list');
-  const dayMatches = data.matches.map((m,i)=>({...m,origIdx:i})).filter(m=>m.date===targetDate).reverse();
+  const dayMatches = data.matches.map((m,i)=>({...m,origIdx:i})).filter(m=>targetKeys.includes(m.date)).reverse();
 
   if (dayMatches.length === 0) {
     hl.innerHTML = '<div class="empty">No matches on this day.</div>';
@@ -1984,8 +2011,10 @@ function render() {
       const isDisputed    = m.status === 'disputed';
       const isMine        = !!(currentPid && m.loggedByPid === currentPid);   // I logged it
       const canAct        = !!id;                            // old list (before migration) is read-only
-      const canEdit       = canAct && (isAdmin || isMine);
-      const canDelete     = canAct && (isAdmin || isMine);
+      // Admin can change or delete anything. The player who logged a match can only correct it
+      // while it is still waiting for the opponent; nobody but the admin can delete a match.
+      const canEdit       = canAct && (isAdmin || (isMine && isProvisional));
+      const canDelete     = canAct && isAdmin;
       const isEditing     = canAct && editingMatch === id;
       const eloChange     = eloChanges[i];
 
@@ -1996,13 +2025,13 @@ function render() {
       let editSection = '';
       if (isEditing && canEdit) {
         editSection = `<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
-          <select id="edit-winner-${id}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.winner?'selected':''}>${p.name}</option>`).join('')}
+          <select id="edit-winner-${esc(id)}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
+            ${data.players.map(p=>`<option value="${esc(p.name)}" ${p.name===m.winner?'selected':''}>${esc(p.name)}</option>`).join('')}
           </select>
-          <select id="edit-loser-${id}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.loser?'selected':''}>${p.name}</option>`).join('')}
+          <select id="edit-loser-${esc(id)}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
+            ${data.players.map(p=>`<option value="${esc(p.name)}" ${p.name===m.loser?'selected':''}>${esc(p.name)}</option>`).join('')}
           </select>
-          <button class="btn-act btn-act-confirm" onclick="saveEditMatch('${id}')">Save</button>
+          <button class="btn-act btn-act-confirm" onclick="saveEditMatch(${jsArg(id)})">Save</button>
         </div>`;
       }
 
@@ -2010,19 +2039,19 @@ function render() {
         <div class="row">
           <span style="font-size:14px">
             ${statusBadge}
-            <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> beat
-            <span class="loss">${getPlayerBadge(m.loser)}${m.loser}</span>
+            <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+            <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
           </span>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-            <span style="color:#475569;font-size:12px">${m.date}</span>
+            <span style="color:#475569;font-size:12px">${fmtDate(m.date)}</span>
             ${eloChange?`<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>`:''}
-            ${canAct&&isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch('${id}')">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch('${id}')">🗑️</button>`:''}
-            ${canAct&&isProvisional&&currentPid&&m.loserPid===currentPid&&!isMine?`<button class="btn-act btn-act-confirm" onclick="confirmMatch('${id}')">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch('${id}')">🚨</button>`:''}
-            ${canEdit&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch('${id}')">✏️</button>`:''}
-            ${canDelete&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="${isAdmin?'deleteMatch':'rejectMatch'}('${id}')">🗑️</button>`:''}
+            ${canAct&&isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch(${jsArg(id)})">🗑️</button>`:''}
+            ${canAct&&isProvisional&&currentPid&&m.loserPid===currentPid&&!isMine?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${jsArg(id)})">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch(${jsArg(id)})">🚨</button>`:''}
+            ${canEdit&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch(${jsArg(id)})">✏️</button>`:''}
+            ${canDelete&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="deleteMatch(${jsArg(id)})">🗑️</button>`:''}
           </div>
         </div>
-        ${isDisputed?`<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy||m.loser} — waiting for admin</div>`:''}
+        ${isDisputed?`<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${esc(m.disputedBy||m.loser)} — waiting for admin</div>`:''}
         ${editSection}
       </div>`;
     }).join('');
@@ -2041,26 +2070,26 @@ function render() {
       let editSection = '';
       if (isEditing) {
         const catOptions = '<option value="">No category</option>' +
-          categories.map(c => `<option value="${c.code}" ${p.lang===c.code?'selected':''}>${c.type==='emoji'?c.value:'🏳️'} ${c.label}</option>`).join('');
+          categories.map(c => `<option value="${esc(c.code)}" ${p.lang===c.code?'selected':''}>${c.type==='emoji'?esc(c.value):'🏳️'} ${esc(c.label)}</option>`).join('');
         editSection = `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
           <div style="display:flex;gap:6px;">
-            <input id="edit-player-${p.name}" value="${p.name}" style="margin-bottom:0;flex:1;">
-            <button class="btn-act btn-act-confirm" onclick="saveEditPlayer('${p.name}')">Save</button>
+            <input id="edit-player-${esc(p.name)}" value="${esc(p.name)}" style="margin-bottom:0;flex:1;">
+            <button class="btn-act btn-act-confirm" onclick="saveEditPlayer(${jsArg(p.name)})">Save</button>
           </div>
-          <select id="edit-lang-${p.name}" style="margin-bottom:0">${catOptions}</select>
-          <input type="password" id="edit-pass-${p.name}" placeholder="New password (leave blank to keep)" style="margin-bottom:0">
-          <input type="email" id="edit-email-${p.name}" value="${(editEmailDraft[p.name] || '').replace(/"/g, '&quot;')}" oninput="editEmailDraft['${p.name}'] = this.value" placeholder="Recovery email (optional, private)" style="margin-bottom:0">
+          <select id="edit-lang-${esc(p.name)}" style="margin-bottom:0">${catOptions}</select>
+          <input type="password" id="edit-pass-${esc(p.name)}" placeholder="New password (leave blank to keep)" style="margin-bottom:0">
+          <input type="email" id="edit-email-${esc(p.name)}" value="${esc(editEmailDraft[p.name] || '')}" oninput="editEmailDraft[${jsArg(p.name)}] = this.value" placeholder="Recovery email (optional, private)" style="margin-bottom:0">
         </div>`;
       }
       return `<div class="card">
         <div class="row">
-          <span style="font-weight:700">${getCategoryBadge(p.lang)}${p.name}</span>
+          <span style="font-weight:700">${getCategoryBadge(p.lang)}${esc(p.name)}</span>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="elo-badge">ELO ${elo}</span>
             <span style="color:#94a3b8;font-size:12px">${s.total} matches</span>
             <div class="btn-actions">
-              <button class="btn-act btn-act-edit"   onclick="startEditPlayer('${p.name}')">✏️</button>
-              <button class="btn-act btn-act-delete" onclick="deletePlayer('${p.name}')">🗑️</button>
+              <button class="btn-act btn-act-edit"   onclick="startEditPlayer(${jsArg(p.name)})">✏️</button>
+              <button class="btn-act btn-act-delete" onclick="deletePlayer(${jsArg(p.name)})">🗑️</button>
             </div>
           </div>
         </div>
@@ -2216,7 +2245,7 @@ function showResetModal(pid) {
   hidePlayerLogin();
   const sel = document.getElementById('reset-select');
   sel.innerHTML = '<option value="">Select player...</option>' +
-    data.players.filter(p => p.pid).map(p => `<option value="${p.pid}">${p.name}</option>`).join('');
+    data.players.filter(p => p.pid).map(p => `<option value="${esc(p.pid)}">${esc(p.name)}</option>`).join('');
   if (pid) sel.value = pid;
   document.getElementById('reset-overlay').style.display = 'flex';
   refreshResetState();
@@ -2349,11 +2378,11 @@ function renderResetRequests() {
   el.innerHTML = items.map(([pid, r]) => {
     const p = data.players.find(x => x.pid === pid);
     return `<div class="card"><div class="row">
-      <span><strong>${p ? p.name : pid}</strong> · code <strong>${requestCode(r.requesterUid)}</strong>
-        <span style="color:#94a3b8;font-size:12px">${r.status}</span></span>
+      <span><strong>${esc(p ? p.name : pid)}</strong> · code <strong>${esc(requestCode(r.requesterUid))}</strong>
+        <span style="color:#94a3b8;font-size:12px">${esc(r.status)}</span></span>
       <div class="btn-actions">
-        ${r.status === 'pending' ? `<button class="btn-act btn-act-confirm" onclick="approveReset('${pid}')">✅ Approve</button>` : ''}
-        <button class="btn-act btn-act-delete" onclick="denyReset('${pid}')">🗑️</button>
+        ${r.status === 'pending' ? `<button class="btn-act btn-act-confirm" onclick="approveReset(${jsArg(pid)})">✅ Approve</button>` : ''}
+        <button class="btn-act btn-act-delete" onclick="denyReset(${jsArg(pid)})">🗑️</button>
       </div></div></div>`;
   }).join('');
 }
@@ -2377,11 +2406,11 @@ function renderResetRequests() {
 function toMatchDocs(list, players) {
   const byName = name => { const p = players.find(x => x.name === name); return p ? p.pid : null; };
   const known  = pid  => players.some(x => x.pid && x.pid === pid);
-  const today  = new Date().toLocaleDateString();
+  const todayKeys = dateKeys(new Date());
   const now    = Timestamp.now();
   return list.map((m, i) => {
     let status = m.status || 'confirmed';
-    if (status === 'provisional' && m.date !== today) status = 'confirmed';
+    if (status === 'provisional' && !todayKeys.includes(m.date)) status = 'confirmed';
     const loggedByPid = (!m.loggedBy || m.loggedBy === 'admin') ? 'admin'
       : (known(m.loggedByPid) ? m.loggedByPid : byName(m.loggedBy));
     const d = {

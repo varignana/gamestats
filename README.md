@@ -33,7 +33,8 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 ### 📋 History
 - Full match history with ELO points won/lost per match
 - Pending matches shown with confirm/reject buttons
-- Players can edit or delete the matches they logged themselves
+- Players can correct a match they logged only while it is still ⏳ provisional (waiting for the opponent)
+- Only the admin can delete a match, or edit one that is already confirmed
 - Admin can edit, delete, confirm or reject any match
 
 ### 👥 Players
@@ -53,8 +54,10 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 - Logins use Firebase Authentication: passwords are hashed by Google and can never be read back
 - Players still just pick their name and type their password (a hidden login address is used behind the scenes)
 - Optional private recovery email lets players reset their own password; otherwise the admin approves a reset request
-- Each match is its own database record: a player can only log matches they played in, only the opponent can confirm or dispute, only the player who logged a match (or the admin) can edit or delete it
+- Each match is its own database record: a player can only log matches they played in, only the opponent can confirm or dispute, only the player who logged a match can correct it, and only while it is provisional; only the admin can delete a match
 - A logged win stays provisional until the opponent confirms; undisputed matches confirm themselves after 24 hours (checked with the server's clock)
+- Every player name, category label and database id is escaped before it is put into the page, so a name containing HTML or script code is shown as plain text and never runs
+- Match dates are stored as `YYYY-MM-DD`, identical on every phone whatever its language or region settings
 - Firestore security rules: everyone can read stats, only the admin can change players, settings and categories
 - API key restricted to GitHub Pages domain only
 
@@ -139,7 +142,7 @@ gamestats/
   categories     → category list
   legacyMatches  → backup of the old single match list (admin only)
 
-matches/<id>          → one match: winner, loser, winnerPid, loserPid, date, loggedBy,
+matches/<id>          → one match: winner, loser, winnerPid, loserPid, date (YYYY-MM-DD), loggedBy,
                         loggedByPid, status, disputedBy, createdAt, pendingSince
 logins/<pid>          → { av } which hidden login address the player uses (public)
 
