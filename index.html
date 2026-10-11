@@ -28,6 +28,8 @@ h1 { font-size: 28px; font-weight: 800; color: #38bdf8; text-align: center; marg
 .subtitle { color: #94a3b8; text-align: center; margin-bottom: 12px; font-size: 14px; }
 input, select { width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: #f1f5f9; border: 1px solid #334155; font-size: 15px; margin-bottom: 16px; outline: none; }
 input:focus, select:focus { border-color: #38bdf8; }
+textarea { width: 100%; padding: 12px; border-radius: 8px; background: #1e293b; color: #f1f5f9; border: 1px solid #334155; font-size: 15px; margin-bottom: 16px; outline: none; font-family: inherit; resize: vertical; }
+textarea:focus { border-color: #38bdf8; }
 label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 .empty { text-align: center; color: #94a3b8; padding: 40px; }
 .loading { text-align: center; color: #94a3b8; padding: 60px 20px; font-size: 16px; }
@@ -341,6 +343,11 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <div class="section-title">🎮 Games</div>
         <div id="game-list"></div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="section-title" style="font-size:14px;margin-bottom:6px">New joiners play in</div>
+          <div style="color:#94a3b8;font-size:12px;margin-bottom:10px">Ticked in the join request form. They can still change it.</div>
+          <div id="default-games" class="game-checks"></div>
+        </div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
           <div class="section-title" style="font-size:14px;margin-bottom:10px">Add Game</div>
           <label>Name</label>
           <input id="newGameName" placeholder="e.g. Table tennis" maxlength="40" style="margin-bottom:10px">
@@ -403,6 +410,22 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
             <input id="newCatFlag" placeholder="e.g. es" style="margin-bottom:10px">
           </div>
           <button class="btn" onclick="addCategory()">Add Category</button>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Notes for the team chat (5.3) -->
+        <div class="section-title">📝 Notes for the team chat</div>
+        <div style="color:#64748b;font-size:12px;margin:-8px 0 10px">Prepare messages at home, copy them at work. Only you can see these.</div>
+        <div id="note-list"></div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <input type="hidden" id="note-id">
+          <label>Title</label>
+          <input id="note-title" maxlength="100" placeholder="e.g. Table tennis tournament" style="margin-bottom:10px">
+          <label>Message</label>
+          <textarea id="note-text" rows="6" maxlength="20000" placeholder="Write or paste the message..."></textarea>
+          <button class="btn" id="note-save-btn" onclick="saveNote()">Save note</button>
+          <button class="btn-outline" id="note-cancel-btn" onclick="clearNoteForm()" style="display:none">Cancel edit</button>
         </div>
 
         <hr class="divider">
@@ -557,6 +580,10 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <input id="join-name" maxlength="30" placeholder="e.g. Nora Ito" style="margin-bottom:10px">
         <label>Your desk</label>
         <select id="join-desk" style="margin-bottom:10px"></select>
+        <div id="join-games-wrap">
+          <label>Games you play</label>
+          <div id="join-games" class="game-checks" style="margin-bottom:10px"></div>
+        </div>
         <label>Choose a password</label>
         <input type="password" id="join-password" placeholder="Password..." style="margin-bottom:10px">
         <label>Confirm password</label>
@@ -626,6 +653,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.18 Match record helpers (used by Import and Reset)
   9.19 Games (switcher, join pop-up, last game, admin tools)
   9.20 Join requests (version label, request from the login screen, admin approval)
+  9.21 Admin extras and usage statistics (default games, notes, Google Analytics helpers)
 ============================================================ -->
 <script type="module">
 
@@ -643,7 +671,7 @@ import {
   signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider, linkWithCredential,
   sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getAnalytics, logEvent } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
+import { getAnalytics, logEvent, setUserId, setUserProperties } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD0WVeoMBX9jEsFTPD9KfOJe6gyKZTOlRI",
@@ -750,9 +778,12 @@ const autoTried     = new Set(); // matches this browser already tried to auto-c
 const DAY_MS        = 24 * 60 * 60 * 1000;
 // App version shown in the footer. Scheme: major.minor. A new major is a whole number (5 -> 6);
 // every smaller change adds to the part after the dot (5.2 -> 5.3).
-const APP_VERSION   = '5.2';
+const APP_VERSION   = '5.3';
 let joinRequests    = {};     // admin only: requestId -> join request (9.20)
 let unsubRequests   = null;   // stops the admin's requests listener on logout
+let notes           = {};     // admin only: adminNotes/<id> (9.21.2)
+let unsubNotes      = null;
+let currentTab      = 'dashboard';   // for usage statistics
 
 /* ----------------------------------------------------------
   9.3 Firebase listeners
@@ -1216,7 +1247,7 @@ async function attemptAdminLogin() {
     if (!ok.exists()) { await signOut(auth); showMessage('Wrong username or password!', 'error'); return; }
     isAdmin = true;
     seedPool();
-    watchRequests();
+    watchAdminData();
     hideAdminLogin();
     showMessage('Welcome admin! 👋', 'success');
     logEvent(analytics, 'admin_login');
@@ -1295,7 +1326,8 @@ async function attemptPlayerLogin() {
     currentPid    = p.pid;
     currentPlayer = name;
     hidePlayerLogin();
-    logEvent(analytics, 'player_login', { player_name: name });
+    logEvent(analytics, 'player_login', { game: currentGameId || '' });
+    identifyUser();
     autoApprovePreviousDays();
     refreshMyEmail();
     userPicked = false; chooseStartGame();         // open the game this player used last
@@ -1318,6 +1350,9 @@ async function playerLogout() {
   myEmail       = '';
   await signOut(auth);
   logEvent(analytics, 'player_logout');
+  restartScreenClock();
+  setUserId(analytics, null);
+  screenCtx = { ...screenCtx, desk: '', player: '' };
   render();
   showMessage('Logged out!', 'info');
 }
@@ -1422,7 +1457,7 @@ async function logMatch() {
     pendingSince: serverTimestamp()
   }));
   if (!ok) return;
-  logEvent(analytics, 'match_logged', { status, logged_by: currentPlayer || 'admin', game: game.id });
+  logEvent(analytics, 'match_logged', { status, logged_by: isAdmin ? 'admin' : 'player', game: game.id });
   rememberLastGame();                              // playing a game also makes it the one opened next time
 
   ['opponent','winner','loser'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1493,7 +1528,8 @@ function openH2H(p1, p2) {
   selectedPlayer   = null;
   const h          = getH2H(p1, p2);
   const eloRatings = calculateAllElos();
-  logEvent(analytics, 'h2h_viewed', { player1: p1, player2: p2 });
+  logEvent(analytics, 'h2h_viewed', { game: currentGameId || '' });
+  trackScreen('h2h');
   const matches = getConfirmed().filter(m =>
     (m.winner === p1 && m.loser === p2) || (m.winner === p2 && m.loser === p1)
   ).reverse();
@@ -1537,6 +1573,7 @@ function openH2H(p1, p2) {
 }
 
 function closeH2H() {
+  trackScreen(currentTab);
   document.getElementById('h2h-screen').classList.remove('active');
   document.getElementById('main-app').style.display = 'block';
   render();
@@ -1721,7 +1758,9 @@ function switchTab(tab, btn) {
   document.getElementById('tab-' + tab).classList.add('active');
   btn.classList.add('active');
   editingMatch = null; editingPlayer = null;
-  logEvent(analytics, 'tab_view', { tab_name: tab });
+  logEvent(analytics, 'tab_view', { tab_name: tab, game: currentGameId || '', category: activeLang });
+  currentTab = tab;
+  trackScreen(tab);
   if (tab === 'players') {
     setTimeout(() => { const el = document.getElementById('minMatchesSetting'); if (el) el.value = settings.minMatches || 0; }, 50);
   }
@@ -1748,7 +1787,7 @@ function togglePlayer(name) { selectedPlayer = selectedPlayer === name ? null : 
 
 function setLangFilter(lang) {
   activeLang = lang; selectedPlayer = null;
-  logEvent(analytics, 'language_filter', { language: lang });
+  logEvent(analytics, 'language_filter', { language: lang, category: lang, game: currentGameId || '' });
   render();
 }
 
@@ -1830,6 +1869,8 @@ function render() {
   renderNewPlayerGames();
   renderGameList();
   renderJoinRequests();
+  renderDefaultGames();
+  renderNotes();
 
   /* --- Category list in admin panel --- */
   const catList = document.getElementById('category-list');
@@ -2246,6 +2287,7 @@ function render() {
           </div>
           <select id="edit-lang-${esc(p.name)}" style="margin-bottom:0">${catOptions}</select>
           <div id="edit-games-${esc(p.name)}" class="game-checks">${gameChecksHTML(joinedIds(p.pid))}</div>
+          <div style="color:#64748b;font-size:11px">Analytics user id: ${esc(p.pid || '')}</div>
           <input type="password" id="edit-pass-${esc(p.name)}" placeholder="New password (leave blank to keep)" style="margin-bottom:0">
           <input type="email" id="edit-email-${esc(p.name)}" value="${esc(editEmailDraft[p.name] || '')}" oninput="editEmailDraft[${jsArg(p.name)}] = this.value" placeholder="Recovery email (optional, private)" style="margin-bottom:0">
         </div>`;
@@ -2296,13 +2338,13 @@ function authError(e)   { return (e && e.code) ? e.code.replace('auth/', '') : '
 
 /* 9.17.2 Auth state — restores the login after a page reload */
 onAuthStateChanged(auth, async (user) => {
-  if (!user) { isAdmin = false; unwatchRequests(); currentPid = null; currentPlayer = null; render(); return; }
+  if (!user) { isAdmin = false; unwatchAdminData(); currentPid = null; currentPlayer = null; render(); return; }
   try {
     const adm = await getDoc(doc(db, 'admins', user.uid));
-    if (adm.exists()) { isAdmin = true; watchRequests(); }
+    if (adm.exists()) { isAdmin = true; watchAdminData(); }
     else {
       const map = await getDoc(doc(db, 'authMap', user.uid));
-      if (map.exists()) { currentPid = map.data().pid; refreshMyEmail(); }
+      if (map.exists()) { currentPid = map.data().pid; refreshMyEmail(); identifyUser(); }
     }
   } catch(e) {}
   autoApprovePreviousDays();
@@ -2716,6 +2758,7 @@ function switchGame(id) {
   rememberDeviceGame(id);
   selectedPlayer = null; editingMatch = null; historyDayOffset = 0;
   logEvent(analytics, 'game_switched', { game: id });
+  trackScreen(currentTab);
   render();
   rememberLastGame();
 }
@@ -2887,17 +2930,24 @@ document.getElementById('app-version').textContent = 'Game Stats v' + APP_VERSIO
 
 /* 9.20.2 Admin list. Only the admin may read requests, so the listener starts after
    admin login and stops on logout (a visitor's listener would be refused). */
-function watchRequests() {
+function watchAdminData() {
   if (unsubRequests) return;
+  unsubNotes = onSnapshot(collection(db, 'adminNotes'), (snap) => {
+    notes = {};
+    snap.forEach(d => { notes[d.id] = d.data(); });
+    render();
+  }, () => {});
   unsubRequests = onSnapshot(requestsCol, (snap) => {
     joinRequests = {};
     snap.forEach(d => { joinRequests[d.id] = d.data(); });
     render();
   }, () => {});
 }
-function unwatchRequests() {
+function unwatchAdminData() {
   if (unsubRequests) { unsubRequests(); unsubRequests = null; }
+  if (unsubNotes) { unsubNotes(); unsubNotes = null; }
   joinRequests = {};
+  notes = {};
 }
 function renderJoinRequests() {
   const el = document.getElementById('join-requests');
@@ -2923,6 +2973,9 @@ function showJoinRequest() {
   sel.innerHTML = '<option value="">Pick your desk...</option>' +
     categories.map(c => `<option value="${esc(c.code)}">${c.type === 'emoji' ? esc(c.value) : '🏳️'} ${esc(c.label)}</option>`).join('');
   ['join-name', 'join-password', 'join-password2'].forEach(id => document.getElementById(id).value = '');
+  // games the admin chose for new joiners are pre-ticked; the visitor may change them
+  document.getElementById('join-games').innerHTML = gameChecksHTML(defaultGameIds());
+  document.getElementById('join-games-wrap').style.display = activeGames().length > 1 ? 'block' : 'none';
   document.getElementById('join-overlay').style.display = 'flex';
   setTimeout(() => document.getElementById('join-name').focus(), 100);
 }
@@ -2937,6 +2990,8 @@ async function submitJoinRequest() {
   if (!desk)        { showMessage('Pick your desk!', 'error'); return; }
   if (pw.length < 4) { showMessage('Use at least 4 characters!', 'error'); return; }
   if (pw !== pw2)   { showMessage('Passwords do not match!', 'error'); return; }
+  const picked = activeGames().length > 1 ? checkedGames('join-games') : defaultGameIds();
+  if (picked.length === 0) { showMessage('Pick at least one game!', 'error'); return; }
   if (data.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
     showMessage('That name is already a player. Log in, or pick another name.', 'error'); return;
   }
@@ -2947,7 +3002,7 @@ async function submitJoinRequest() {
     const cred = await createUserWithEmailAndPassword(tmpAuth, aliasOf(pid, 1), pad(pw));
     // 2. the request. Rules: only their own uid, only 'pending', never over an existing login
     await setDoc(doc(tmpDb, 'requests', reqId), {
-      username: name, pid, desk, uid: cred.user.uid, status: 'pending', createdAt: serverTimestamp()
+      username: name, pid, desk, games: picked, uid: cred.user.uid, status: 'pending', createdAt: serverTimestamp()
     });
     await signOut(tmpAuth);
     hideJoinRequest();
@@ -2969,13 +3024,16 @@ async function approveJoin(reqId) {
   if (data.players.some(p => p.name.toLowerCase() === r.username.toLowerCase())) {
     showMessage('That name is already a player!', 'error'); return;
   }
+  // games they asked for (pre-ticked from the admin's default); only active games count
+  const asked = (Array.isArray(r.games) && r.games.length ? r.games : defaultGameIds()).filter(id => { const g = getGame(id); return g && g.status !== 'archived'; });
+  const joinedGames = asked.length ? asked : defaultGameIds();
   const player  = { name: r.username, lang: r.desk || '', pid: r.pid, av: 1 };
   const players = [...data.players, player];
   const ok = await sync(async () => {
     await setDoc(doc(db, 'logins', r.pid), { av: 1 });                 // the login screen finds the address
     await setDoc(doc(db, 'authMap', r.uid), { pid: r.pid });           // this login belongs to the player
     await setDoc(doc(db, 'playerAuth', r.pid), { uid: r.uid });        // current login of the player
-    await setDoc(doc(db, 'playerGames', r.pid), { joined: [POOL_ID], lastGame: POOL_ID, declined: [] });
+    await setDoc(doc(db, 'playerGames', r.pid), { joined: joinedGames, lastGame: joinedGames[0], declined: [] });
     await setDoc(dataRef, { players }, { merge: true });               // the player appears in the lists
     await deleteDoc(doc(db, 'requests', reqId));                       // the request is done
   });
@@ -2987,6 +3045,137 @@ async function rejectJoin(reqId) {
   const r = joinRequests[reqId];
   if (!r || !confirm('Reject the request from ' + r.username + '?')) return;
   if (await sync(() => deleteDoc(doc(db, 'requests', reqId)))) showMessage('Request removed', 'info');
+}
+
+/* ----------------------------------------------------------
+  9.21 Admin extras and usage statistics (app 5.3)
+  9.21.1 Default games for new joiners (pre-ticked in the join request form)
+  9.21.2 Notes for the team chat (admin only; prepare at home, copy at work)
+  9.21.3 Usage statistics helpers (Google Analytics)
+---------------------------------------------------------- */
+
+/* 9.21.1 Default games for new joiners. Stored in gamestats/settings.defaultGames (admin writes).
+   An archived or missing game is ignored; with nothing valid left the first active game is used. */
+function defaultGameIds() {
+  const ids = (Array.isArray(settings.defaultGames) ? settings.defaultGames : [POOL_ID])
+    .filter(id => { const g = getGame(id); return g && g.status !== 'archived'; });
+  return ids.length ? ids : [(activeGames()[0] || games[0]).id];
+}
+function renderDefaultGames() {
+  const el = document.getElementById('default-games');
+  if (!el) return;
+  const sel = defaultGameIds();
+  el.innerHTML = activeGames().map(g =>
+    `<label><input type="checkbox" value="${esc(g.id)}" ${sel.includes(g.id) ? 'checked' : ''} onchange="saveDefaultGames()"> ${esc(g.emoji)} ${esc(g.name)}</label>`).join('');
+}
+async function saveDefaultGames() {
+  const ids = checkedGames('default-games');
+  if (ids.length === 0) { showMessage('Pick at least one game!', 'error'); renderDefaultGames(); return; }
+  settings.defaultGames = ids;
+  if (await sync(() => setDoc(settingsRef, { defaultGames: ids }, { merge: true })))
+    showMessage('New joiners will start in the ticked games', 'success');
+}
+
+/* 9.21.2 Notes. adminNotes/<id> = { title, text, updatedAt }. Only the admin can read or write them. */
+function renderNotes() {
+  const el = document.getElementById('note-list');
+  if (!el) return;
+  const items = Object.entries(notes).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+  if (items.length === 0) { el.innerHTML = '<div style="color:#64748b;font-size:13px;margin-bottom:12px">No notes yet.</div>'; return; }
+  el.innerHTML = items.map(([id, n]) => `<div class="card">
+    <div class="row">
+      <span style="font-weight:700">${esc(n.title)}</span>
+      <div class="btn-actions">
+        <button class="btn-act btn-act-confirm" onclick="copyNote(${jsArg(id)})">📋 Copy</button>
+        <button class="btn-act btn-act-edit" onclick="editNote(${jsArg(id)})">✏️</button>
+        <button class="btn-act btn-act-delete" onclick="deleteNote(${jsArg(id)})">🗑️</button>
+      </div>
+    </div>
+    <div style="color:#94a3b8;font-size:12px;white-space:pre-wrap;margin-top:8px;max-height:90px;overflow:hidden">${esc(n.text)}</div>
+  </div>`).join('');
+}
+function clearNoteForm() {
+  ['note-id', 'note-title', 'note-text'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('note-save-btn').textContent = 'Save note';
+  document.getElementById('note-cancel-btn').style.display = 'none';
+}
+async function saveNote() {
+  const id    = document.getElementById('note-id').value;
+  const text  = document.getElementById('note-text').value;
+  const title = document.getElementById('note-title').value.trim() || text.trim().slice(0, 40) || 'Untitled';
+  if (!text.trim()) { showMessage('Write the message first!', 'error'); return; }
+  const ref = id ? doc(db, 'adminNotes', id) : doc(collection(db, 'adminNotes'));
+  if (!await sync(() => setDoc(ref, { title: title.slice(0, 100), text, updatedAt: Date.now() }))) return;
+  clearNoteForm();
+  showMessage('Note saved ✅', 'success');
+}
+function editNote(id) {
+  const n = notes[id];
+  if (!n) return;
+  document.getElementById('note-id').value    = id;
+  document.getElementById('note-title').value = n.title;
+  document.getElementById('note-text').value  = n.text;
+  document.getElementById('note-save-btn').textContent = 'Update note';
+  document.getElementById('note-cancel-btn').style.display = 'block';
+  document.getElementById('note-text').focus();
+}
+async function deleteNote(id) {
+  const n = notes[id];
+  if (!n || !confirm('Delete the note "' + n.title + '"?')) return;
+  if (await sync(() => deleteDoc(doc(db, 'adminNotes', id)))) showMessage('Note deleted', 'info');
+}
+// Copies the note text. The modern clipboard call can be refused on some phones, so a
+// hidden text box and the old copy command are the fallback.
+async function copyNote(id) {
+  const n = notes[id];
+  if (!n) return;
+  let ok = false;
+  try { await navigator.clipboard.writeText(n.text); ok = true; }
+  catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = n.text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch(_) {}
+    ta.remove();
+  }
+  showMessage(ok ? 'Copied! Paste it in the chat 📋' : 'Could not copy. Open the note with ✏️ and copy by hand.', ok ? 'success' : 'error');
+}
+
+/* 9.21.3 Usage statistics (Google Analytics 4).
+   Who and where: every report carries game, category (the filter on screen), desk (the player's own
+   category) and player (name). The player's random id is the GA user id.
+   - trackScreen: a "screen_view" each time a section opens (stats, odds, log, history, players, h2h).
+   - section_time: when the visitor leaves a section (tab change, tab hidden, page closed) one event with
+     the seconds spent there (capped at 30 minutes so a forgotten open tab does not inflate the totals).
+     Because it carries game, category, desk and player, any total can be sliced by those.
+   In GA4 register the parameters game, category, desk, player and section as event-scoped custom
+   dimensions and `seconds` as a custom metric (unit: seconds). See SETUP-GUIDE.md. */
+let screenName = null, screenSince = 0, screenCtx = {};
+function gaContext() {
+  const me = data.players.find(p => p.pid === currentPid);
+  return { game: currentGameId || '', category: activeLang, desk: me ? (me.lang || 'none') : '', player: me ? me.name : '' };
+}
+function flushScreenTime() {
+  if (screenName && screenSince) {
+    const sec = Math.round((Date.now() - screenSince) / 1000);
+    if (sec >= 1) logEvent(analytics, 'section_time', { ...screenCtx, section: screenName, seconds: Math.min(sec, 1800) });
+  }
+  screenSince = 0;
+}
+function restartScreenClock() { flushScreenTime(); screenSince = Date.now(); screenCtx = gaContext(); }
+function trackScreen(name) {
+  flushScreenTime();
+  screenName = name; screenSince = Date.now(); screenCtx = gaContext();
+  logEvent(analytics, 'screen_view', { firebase_screen: name, firebase_screen_class: 'GameStats', ...screenCtx });
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushScreenTime(); else if (screenName) { screenSince = Date.now(); screenCtx = gaContext(); } });
+window.addEventListener('pagehide', flushScreenTime);
+function identifyUser() {
+  const me = data.players.find(p => p.pid === currentPid);
+  restartScreenClock();                      // time so far belongs to the visitor before login
+  setUserId(analytics, currentPid || null);
+  setUserProperties(analytics, { desk: (me && me.lang) || 'none', player_name: me ? me.name : '' });
+  screenCtx = gaContext();
 }
 
 /* ----------------------------------------------------------
@@ -3063,7 +3252,14 @@ window.hideJoinRequest        = hideJoinRequest;
 window.submitJoinRequest      = submitJoinRequest;
 window.approveJoin            = approveJoin;
 window.rejectJoin             = rejectJoin;
+window.saveDefaultGames       = saveDefaultGames;
+window.saveNote               = saveNote;
+window.editNote               = editNote;
+window.deleteNote             = deleteNote;
+window.copyNote               = copyNote;
+window.clearNoteForm          = clearNoteForm;
 
+trackScreen('dashboard');
 render();
 handleEmailLink();      // opens the reset screen when the page was opened from an email link
 </script>

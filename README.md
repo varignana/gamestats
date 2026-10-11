@@ -23,6 +23,15 @@ A real-time match tracker for office games (pool, table tennis, and any game the
 - A request cannot create a player, a login mapping or a match: only the admin can. The same name cannot be requested twice, and a name that already belongs to a player is refused
 - The admin can still add players by hand
 
+### ⚙️ Admin extras (5.3)
+- **Default games for new joiners:** Players tab → 🎮 Games → "New joiners play in". The ticked games are pre-ticked in the join request form (the colleague can change them) and become the new player's games on approval
+- **Notes for the team chat:** Players tab → 📝 Notes. Write or paste a message at home, save it, then at work tap **📋 Copy** and paste it into the chat. Several notes, edit and delete supported. Only the admin can read them
+
+### 📈 Usage statistics (Google Analytics 4)
+- Every section you open (stats, odds, log, history, players, head to head) sends a `screen_view`, and leaving it sends a `section_time` event with the seconds spent (capped at 30 minutes per visit)
+- Each event carries `game`, `category` (the filter on screen), `desk` (the player's own category) and `player` (name); the player's random id is the GA user id. In GA4 you can then total time per section, per desk, per game, per player, or any combination
+- Setup in GA4 (once): Admin → Custom definitions → event-scoped dimensions `game`, `category`, `desk`, `player`, `section`, and a custom metric `seconds` (unit: seconds). See SETUP-GUIDE.md. Colleagues are told by the admin; there is no on-page notice
+
 ### 🏷️ Version
 - The app version is shown at the bottom of the page (`Game Stats v5.2`). Scheme: major.minor. A big change is a new whole number (5 → 6), every smaller update adds to the number after the dot (5.2 → 5.3). It lives in one constant, `APP_VERSION`, in `index.html`
 
@@ -155,6 +164,7 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 | `game_joined` | Player joined a game (includes game) |
 | `game_added` | Admin added a game (includes game) |
 | `join_requested` | A colleague sent a join request |
+| `screen_view` | A section is opened (firebase_screen, game, category) |
 
 ---
 
@@ -162,12 +172,13 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 ```
 gamestats/
   data           → players array (name, lang, pid, av). Admin writes only.
-  settings       → leaderboard settings (min matches threshold)
+  settings       → leaderboard settings (min matches threshold, defaultGames for new joiners)
   categories     → category list
 
 games/<id>            → one game: name, emoji, description, status (active/archived), order,
                         rules { eloK, eloBase, scoring, format }, createdAt. Admin writes, never deleted.
                         The id (e.g. "pool", "table-tennis") never changes, even if the game is renamed.
+adminNotes/<id>     → { title, text, updatedAt }: the admin's notes. Admin only.
 requests/<name>      → a join request: username, pid, desk, uid, status ('pending'), createdAt.
                         The id is the lowercase name (encoded), so a name can be requested once. Admin reads/deletes.
 playerGames/<pid>     → { joined: [gameIds], lastGame, declined: [gameIds] }. The player (or admin) writes it.
@@ -228,6 +239,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 - [x] Legacy migration tools and plain-text passwords removed
 - [x] Several games in one portal (pool, table tennis, ...)
 - [x] Self-service join requests with admin approval (5.2)
+- [x] Default games for new joiners, admin notes, per-section usage statistics (5.3)
 - [ ] Per-game scoring (sets/points) and doubles
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
