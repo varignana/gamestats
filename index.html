@@ -175,6 +175,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 .join-banner { background:#1e293b; border:1px solid #38bdf8; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px; color:#94a3b8; display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .game-checks label { display:flex; align-items:center; gap:8px; font-size:14px; margin-bottom:6px; color:#f1f5f9; }
 .game-checks input { width:auto; margin:0; }
+.app-version { text-align:center; color:#475569; font-size:11px; margin:24px 0 8px; }
 
 /* 1.8 History Navigation */
 .history-nav { display:flex; justify-content:space-between; align-items:center; background:#1e293b; border-radius:10px; padding:10px 16px; margin-bottom:16px; }
@@ -328,6 +329,10 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
       <div id="admin-content" style="display:none">
 
+        <!-- Join requests (5.2) -->
+        <div class="section-title">🙋 Join requests</div>
+        <div id="join-requests" style="margin-bottom:16px"></div>
+
         <!-- Password reset requests -->
         <div class="section-title">🔑 Password reset requests</div>
         <div id="reset-requests" style="margin-bottom:16px"></div>
@@ -476,6 +481,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <input type="password" id="player-login-password" placeholder="Password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') attemptPlayerLogin()">
         <button class="btn" onclick="attemptPlayerLogin()">Login</button>
         <button class="btn-outline" onclick="showResetModal()">Forgot password?</button>
+        <button class="btn-outline" onclick="showJoinRequest()">New here? Request to join</button>
         <button class="btn-danger" onclick="hidePlayerLogin()">Cancel</button>
       </div>
     </div>
@@ -542,6 +548,24 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
+    <!-- 7.9 Request to join (5.2) -->
+    <div id="join-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>🙋 Request to join</h3>
+        <p>The admin approves you, then you log in with the name and password you choose here.</p>
+        <label>Your name</label>
+        <input id="join-name" maxlength="30" placeholder="e.g. Nora Ito" style="margin-bottom:10px">
+        <label>Your desk</label>
+        <select id="join-desk" style="margin-bottom:10px"></select>
+        <label>Choose a password</label>
+        <input type="password" id="join-password" placeholder="Password..." style="margin-bottom:10px">
+        <label>Confirm password</label>
+        <input type="password" id="join-password2" placeholder="Confirm password..." style="margin-bottom:16px" onkeydown="if(event.key==='Enter') submitJoinRequest()">
+        <button class="btn" onclick="submitJoinRequest()">Send request</button>
+        <button class="btn-danger" onclick="hideJoinRequest()">Cancel</button>
+      </div>
+    </div>
+
     <!-- 7.5 Edit Category Modal -->
     <div id="edit-cat-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
@@ -567,6 +591,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
+    <div class="app-version" id="app-version"></div>
   </div><!-- end main-app -->
 
   <!-- ============================================================
@@ -600,6 +625,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.17 Secure accounts (Firebase Auth login, reset, recovery email)
   9.18 Match record helpers (used by Import and Reset)
   9.19 Games (switcher, join pop-up, last game, admin tools)
+  9.20 Join requests (version label, request from the login screen, admin approval)
 ============================================================ -->
 <script type="module">
 
@@ -643,6 +669,7 @@ const auth = initializeAuth(app, { persistence: browserSessionPersistence });
 //     proof – proves ownership of a recovery email (in memory)
 const tmpApp    = initializeApp(firebaseConfig, 'tmp');
 const tmpAuth   = initializeAuth(tmpApp,   { persistence: inMemoryPersistence });
+const tmpDb     = getFirestore(tmpApp);                // join requests are written from here (9.20.3)
 const resetApp  = initializeApp(firebaseConfig, 'reset');
 const resetAuth = initializeAuth(resetApp, { persistence: browserLocalPersistence });
 const resetDb   = getFirestore(resetApp);
@@ -658,6 +685,7 @@ const matchesCol     = collection(db, 'matches');              // one document p
 const loginsCol      = collection(db, 'logins');               // logins/<pid> = { av }
 const gamesCol       = collection(db, 'games');               // games/<id> = one document per game (pool, table tennis, ...)
 const playerGamesCol = collection(db, 'playerGames');         // playerGames/<pid> = { joined, lastGame, declined }
+const requestsCol    = collection(db, 'requests');            // requests/<name> = a join request (9.20)
 
 logEvent(analytics, 'app_open');
 
@@ -720,6 +748,11 @@ let matchDocs       = [];     // matches as stored in matches/<id> (raw, before 
 let loginAvs        = {};     // pid -> login version, from logins/<pid>
 const autoTried     = new Set(); // matches this browser already tried to auto-confirm
 const DAY_MS        = 24 * 60 * 60 * 1000;
+// App version shown in the footer. Scheme: major.minor. A new major is a whole number (5 -> 6);
+// every smaller change adds to the part after the dot (5.2 -> 5.3).
+const APP_VERSION   = '5.2';
+let joinRequests    = {};     // admin only: requestId -> join request (9.20)
+let unsubRequests   = null;   // stops the admin's requests listener on logout
 
 /* ----------------------------------------------------------
   9.3 Firebase listeners
@@ -1183,6 +1216,7 @@ async function attemptAdminLogin() {
     if (!ok.exists()) { await signOut(auth); showMessage('Wrong username or password!', 'error'); return; }
     isAdmin = true;
     seedPool();
+    watchRequests();
     hideAdminLogin();
     showMessage('Welcome admin! 👋', 'success');
     logEvent(analytics, 'admin_login');
@@ -1795,6 +1829,7 @@ function render() {
   /* --- Admin: games ticked in the Add Player form, and the game list --- */
   renderNewPlayerGames();
   renderGameList();
+  renderJoinRequests();
 
   /* --- Category list in admin panel --- */
   const catList = document.getElementById('category-list');
@@ -2261,10 +2296,10 @@ function authError(e)   { return (e && e.code) ? e.code.replace('auth/', '') : '
 
 /* 9.17.2 Auth state — restores the login after a page reload */
 onAuthStateChanged(auth, async (user) => {
-  if (!user) { isAdmin = false; currentPid = null; currentPlayer = null; render(); return; }
+  if (!user) { isAdmin = false; unwatchRequests(); currentPid = null; currentPlayer = null; render(); return; }
   try {
     const adm = await getDoc(doc(db, 'admins', user.uid));
-    if (adm.exists()) { isAdmin = true; }
+    if (adm.exists()) { isAdmin = true; watchRequests(); }
     else {
       const map = await getDoc(doc(db, 'authMap', user.uid));
       if (map.exists()) { currentPid = map.data().pid; refreshMyEmail(); }
@@ -2835,6 +2870,126 @@ async function toggleArchiveGame(id) {
 }
 
 /* ----------------------------------------------------------
+  9.20 Join requests (app 5.2)
+  A new colleague asks to join from the login screen with a name, a desk and a
+  password of their own. Their login is created straight away (same hidden-address
+  scheme as 9.17), but they are not a player yet. The admin approves: the player is
+  created and the requester's login becomes that player's login. Or the admin rejects:
+  the request is removed. The admin can still add players by hand (9.11).
+  9.20.1 Version label
+  9.20.2 Admin list (live, only while the admin is logged in)
+  9.20.3 Requester: send a request
+  9.20.4 Admin: approve or reject
+---------------------------------------------------------- */
+
+/* 9.20.1 Version label: change APP_VERSION (section 9.2) when the app changes */
+document.getElementById('app-version').textContent = 'Game Stats v' + APP_VERSION;
+
+/* 9.20.2 Admin list. Only the admin may read requests, so the listener starts after
+   admin login and stops on logout (a visitor's listener would be refused). */
+function watchRequests() {
+  if (unsubRequests) return;
+  unsubRequests = onSnapshot(requestsCol, (snap) => {
+    joinRequests = {};
+    snap.forEach(d => { joinRequests[d.id] = d.data(); });
+    render();
+  }, () => {});
+}
+function unwatchRequests() {
+  if (unsubRequests) { unsubRequests(); unsubRequests = null; }
+  joinRequests = {};
+}
+function renderJoinRequests() {
+  const el = document.getElementById('join-requests');
+  if (!el) return;
+  const items = Object.entries(joinRequests);
+  if (items.length === 0) { el.innerHTML = '<div style="color:#64748b;font-size:13px">No join requests.</div>'; return; }
+  el.innerHTML = items.map(([id, r]) => {
+    const cat = getCategoryObj(r.desk);
+    return `<div class="card"><div class="row">
+      <span><strong>${esc(r.username)}</strong> <span style="color:#94a3b8;font-size:12px">${cat ? getCategoryBadge(r.desk) + esc(cat.label) : 'no desk'}</span></span>
+      <div class="btn-actions">
+        <button class="btn-act btn-act-confirm" onclick="approveJoin(${jsArg(id)})">✅ Approve</button>
+        <button class="btn-act btn-act-delete" onclick="rejectJoin(${jsArg(id)})">🗑️</button>
+      </div></div></div>`;
+  }).join('');
+}
+
+/* 9.20.3 Requester. The request id is the lowercase name, so the database refuses a
+   second request with the same name (the create is denied when the document exists). */
+function showJoinRequest() {
+  hidePlayerLogin();
+  const sel = document.getElementById('join-desk');
+  sel.innerHTML = '<option value="">Pick your desk...</option>' +
+    categories.map(c => `<option value="${esc(c.code)}">${c.type === 'emoji' ? esc(c.value) : '🏳️'} ${esc(c.label)}</option>`).join('');
+  ['join-name', 'join-password', 'join-password2'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('join-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('join-name').focus(), 100);
+}
+function hideJoinRequest() { document.getElementById('join-overlay').style.display = 'none'; }
+
+async function submitJoinRequest() {
+  const name = document.getElementById('join-name').value.trim().replace(/\s+/g, ' ');
+  const desk = document.getElementById('join-desk').value;
+  const pw   = document.getElementById('join-password').value;
+  const pw2  = document.getElementById('join-password2').value;
+  if (!name || name.length > 30) { showMessage('Enter your name (up to 30 characters)!', 'error'); return; }
+  if (!desk)        { showMessage('Pick your desk!', 'error'); return; }
+  if (pw.length < 4) { showMessage('Use at least 4 characters!', 'error'); return; }
+  if (pw !== pw2)   { showMessage('Passwords do not match!', 'error'); return; }
+  if (data.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showMessage('That name is already a player. Log in, or pick another name.', 'error'); return;
+  }
+  const reqId = encodeURIComponent(name.toLowerCase());
+  const pid   = newId();
+  try {
+    // 1. the requester's own login (signed in on the temporary app, so the write below is theirs)
+    const cred = await createUserWithEmailAndPassword(tmpAuth, aliasOf(pid, 1), pad(pw));
+    // 2. the request. Rules: only their own uid, only 'pending', never over an existing login
+    await setDoc(doc(tmpDb, 'requests', reqId), {
+      username: name, pid, desk, uid: cred.user.uid, status: 'pending', createdAt: serverTimestamp()
+    });
+    await signOut(tmpAuth);
+    hideJoinRequest();
+    logEvent(analytics, 'join_requested');
+    showMessage('Request sent! ✅ The admin will approve you. Then log in with your name and password.', 'success');
+  } catch(e) {
+    await signOut(tmpAuth).catch(() => {});
+    showMessage(e.code === 'permission-denied'
+      ? 'That name was already requested. Pick another name.'
+      : 'Could not send the request: ' + authError(e), 'error');
+  }
+}
+
+/* 9.20.4 Admin. Approving writes the same records createLogin() writes, but with the
+   requester's own login (their uid) instead of a new one. */
+async function approveJoin(reqId) {
+  const r = joinRequests[reqId];
+  if (!r) return;
+  if (data.players.some(p => p.name.toLowerCase() === r.username.toLowerCase())) {
+    showMessage('That name is already a player!', 'error'); return;
+  }
+  const player  = { name: r.username, lang: r.desk || '', pid: r.pid, av: 1 };
+  const players = [...data.players, player];
+  const ok = await sync(async () => {
+    await setDoc(doc(db, 'logins', r.pid), { av: 1 });                 // the login screen finds the address
+    await setDoc(doc(db, 'authMap', r.uid), { pid: r.pid });           // this login belongs to the player
+    await setDoc(doc(db, 'playerAuth', r.pid), { uid: r.uid });        // current login of the player
+    await setDoc(doc(db, 'playerGames', r.pid), { joined: [POOL_ID], lastGame: POOL_ID, declined: [] });
+    await setDoc(dataRef, { players }, { merge: true });               // the player appears in the lists
+    await deleteDoc(doc(db, 'requests', reqId));                       // the request is done
+  });
+  if (!ok) return;
+  data.players = players;
+  showMessage(r.username + ' approved! They can log in now.', 'success');
+}
+async function rejectJoin(reqId) {
+  const r = joinRequests[reqId];
+  if (!r || !confirm('Reject the request from ' + r.username + '?')) return;
+  if (await sync(() => deleteDoc(doc(db, 'requests', reqId)))) showMessage('Request removed', 'info');
+}
+
+/* ----------------------------------------------------------
   9.16 Window exports
   Make functions accessible from HTML onclick attributes
 ---------------------------------------------------------- */
@@ -2903,6 +3058,11 @@ window.editGame               = editGame;
 window.saveEditGame           = saveEditGame;
 window.closeEditGameModal     = closeEditGameModal;
 window.toggleArchiveGame      = toggleArchiveGame;
+window.showJoinRequest        = showJoinRequest;
+window.hideJoinRequest        = hideJoinRequest;
+window.submitJoinRequest      = submitJoinRequest;
+window.approveJoin            = approveJoin;
+window.rejectJoin             = rejectJoin;
 
 render();
 handleEmailLink();      // opens the reset screen when the page was opened from an email link

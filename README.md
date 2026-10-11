@@ -17,6 +17,15 @@ A real-time match tracker for office games (pool, table tennis, and any game the
 - Admin: add a game (name, icon, description, ELO K-factor and starting ELO), edit it, archive or restore it. Games are never deleted: an archived game disappears from the switcher and takes no new matches, its history stays
 - Pool is the built-in first game: matches logged before games existed (no `gameId`) count as pool, so nothing had to be migrated
 
+### 🙋 Join requests
+- A new colleague taps **Login → New here? Request to join**, enters a unique name, picks their desk (category/flag) and chooses a password
+- The admin sees the request in the Players tab (🙋 Join requests) and approves or rejects it. Approving creates the player; the requester's own login becomes theirs, so they log in with the password they chose
+- A request cannot create a player, a login mapping or a match: only the admin can. The same name cannot be requested twice, and a name that already belongs to a player is refused
+- The admin can still add players by hand
+
+### 🏷️ Version
+- The app version is shown at the bottom of the page (`Game Stats v5.2`). Scheme: major.minor. A big change is a new whole number (5 → 6), every smaller update adds to the number after the dot (5.2 → 5.3). It lives in one constant, `APP_VERSION`, in `index.html`
+
 ### 🏆 Leaderboard
 - ELO rating system — the same used in chess and football
 - Ranked by ELO, showing win/loss record and win percentage
@@ -145,6 +154,7 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 | `game_switched` | Game chip tapped (includes game) |
 | `game_joined` | Player joined a game (includes game) |
 | `game_added` | Admin added a game (includes game) |
+| `join_requested` | A colleague sent a join request |
 
 ---
 
@@ -158,6 +168,8 @@ gamestats/
 games/<id>            → one game: name, emoji, description, status (active/archived), order,
                         rules { eloK, eloBase, scoring, format }, createdAt. Admin writes, never deleted.
                         The id (e.g. "pool", "table-tennis") never changes, even if the game is renamed.
+requests/<name>      → a join request: username, pid, desk, uid, status ('pending'), createdAt.
+                        The id is the lowercase name (encoded), so a name can be requested once. Admin reads/deletes.
 playerGames/<pid>     → { joined: [gameIds], lastGame, declined: [gameIds] }. The player (or admin) writes it.
                         No document = pool player only (how everybody started).
 
@@ -215,6 +227,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 - [x] Admin-only delete, escaped player names, ISO dates
 - [x] Legacy migration tools and plain-text passwords removed
 - [x] Several games in one portal (pool, table tennis, ...)
+- [x] Self-service join requests with admin approval (5.2)
 - [ ] Per-game scoring (sets/points) and doubles
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
