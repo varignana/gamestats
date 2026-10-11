@@ -323,6 +323,13 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <button class="btn-outline" onclick="deleteLegacyPasswords()">2. Delete old plain-text passwords</button>
           <div id="migration-status" style="color:#94a3b8;font-size:12px;margin-top:8px"></div>
         </div>
+        <!-- One-off: move the shared match list into one document per match -->
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="section-title" style="font-size:14px;margin-bottom:6px">🗂️ Separate match records</div>
+          <p style="color:#94a3b8;font-size:12px;margin:0 0 10px">One-off upgrade: copies every match into its own record so players can only change their own matches. A backup of the old list is kept. Safe to press again.</p>
+          <button class="btn-outline" onclick="migrateMatches()">3. Move matches to separate records</button>
+          <div id="match-migration-status" style="color:#94a3b8;font-size:12px;margin-top:8px"></div>
+        </div>
 
         <!-- Add Player -->
         <div class="section-title">Add Player</div>
@@ -534,6 +541,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.15 Main render function
   9.16 Window exports
   9.17 Secure accounts (Firebase Auth login, migration, reset, recovery email)
+  9.18 Separate match records (one-off migration + helpers)
 ============================================================ -->
 <script type="module">
 
@@ -541,7 +549,10 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.1 Firebase imports & config
 ---------------------------------------------------------- */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, deleteDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getFirestore, doc, collection, onSnapshot, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc,
+  writeBatch, serverTimestamp, deleteField, Timestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   initializeAuth, browserSessionPersistence, browserLocalPersistence, inMemoryPersistence,
   onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously,
@@ -586,6 +597,9 @@ const dataRef        = doc(db, 'gamestats', 'data');
 const settingsRef    = doc(db, 'gamestats', 'settings');
 const categoriesRef  = doc(db, 'gamestats', 'categories');  // NEW — stores categories
 const adminRef       = doc(db, 'admin', 'credentials');
+const matchesCol     = collection(db, 'matches');              // one document per match
+const loginsCol      = collection(db, 'logins');               // logins/<pid> = { av }
+const legacyBackupRef= doc(db, 'gamestats', 'legacyMatches');  // safety copy made by the migration
 const playersAuthRef = doc(db, 'admin', 'playerPasswords');
 
 logEvent(analytics, 'app_open');
@@ -627,6 +641,11 @@ let isAdmin         = false;
 let matchResult     = 'won';
 let eloInfoOpen     = false;
 let historyDayOffset= 0;
+let matchDocs       = [];     // matches as stored in matches/<id> (raw, before names are filled in)
+let legacyMatches   = [];     // the old single list inside gamestats/data (empty once migrated)
+let loginAvs        = {};     // pid -> login version, from logins/<pid>
+const autoTried     = new Set(); // matches this browser already tried to auto-confirm
+const DAY_MS        = 24 * 60 * 60 * 1000;
 
 /* ----------------------------------------------------------
   9.3 Firebase listeners
@@ -655,20 +674,60 @@ onSnapshot(categoriesRef, (snap) => {
   render();
 });
 
-// Data listener — players and matches
+// Data listener — the player list (and, until the migration has run, the old match list)
 onSnapshot(dataRef, (snap) => {
-  if (snap.exists()) {
-    const d = snap.data();
-    data.players = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
-    data.matches  = d.matches || [];
-  } else {
-    data = { players: [], matches: [] };
-  }
+  const d = snap.exists() ? snap.data() : {};
+  data.players  = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+  legacyMatches = d.matches || [];
+  rebuildMatches();
   autoApprovePreviousDays();
   setSyncStatus('live');
   dataReadyResolve();
   render();
 }, () => setSyncStatus('error'));
+
+// Matches listener — one document per match
+onSnapshot(matchesCol, (snap) => {
+  matchDocs = snap.docs.map(d => {
+    // 'estimate' fills in our own just-written server time until the server confirms it
+    const m = d.data({ serverTimestamps: 'estimate' });
+    return {
+      ...m,
+      id:           d.id,
+      createdAt:    m.createdAt    ? m.createdAt.toMillis()    : Date.now(),
+      pendingSince: m.pendingSince ? m.pendingSince.toMillis() : Date.now()
+    };
+  });
+  rebuildMatches();
+  autoApprovePreviousDays();
+  render();
+}, () => setSyncStatus('error'));
+
+// Login versions listener — which hidden login address each player uses (see 9.17.1)
+onSnapshot(loginsCol, (snap) => {
+  loginAvs = {};
+  snap.forEach(d => { loginAvs[d.id] = d.data().av; });
+}, () => {});
+
+// Builds data.matches (oldest first, the order ELO is calculated in) from the two sources.
+// Names are looked up from the player id, so a renamed player keeps all their matches
+// and nobody can fake a name inside a match.
+function rebuildMatches() {
+  const nameOf = pid => { const p = data.players.find(x => x.pid && x.pid === pid); return p ? p.name : null; };
+  const live = [...matchDocs]
+    .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
+    .map(m => ({
+      ...m,
+      winner:   nameOf(m.winnerPid) || m.winner,
+      loser:    nameOf(m.loserPid)  || m.loser,
+      loggedBy: m.loggedByPid === 'admin' ? 'admin' : (nameOf(m.loggedByPid) || m.loggedBy)
+    }));
+  // Before the migration: show the old list (read-only) plus anything logged since.
+  // The migration's own copies (ids 'legacy-…') are hidden until the old list is cleared.
+  data.matches = legacyMatches.length > 0
+    ? [...legacyMatches, ...live.filter(m => !m.id.startsWith('legacy-'))]
+    : live;
+}
 
 // Password reset requests (the admin panel shows them)
 onSnapshot(collection(db, 'resets'), (snap) => {
@@ -700,16 +759,31 @@ function showMessage(msg, type = 'info') {
   window._msgTimer = setTimeout(() => el.style.display = 'none', 3000);
 }
 
-async function save() {
+// Runs one database write and shows "Saving..." / an error. Returns true when it worked.
+async function sync(task) {
   setSyncStatus('syncing');
   try {
-    await setDoc(dataRef, { players: data.players, matches: data.matches });
+    await task();
     setSyncStatus('live');
+    return true;
   } catch(e) {
+    console.warn('Save failed:', e.code || e.message);
     setSyncStatus('error');
     showMessage('Error saving data!', 'error');
+    return false;
   }
 }
+
+// Saves the player list (admin only). 'merge' leaves the old match list alone until the migration.
+async function savePlayers() {
+  return sync(() => setDoc(dataRef, { players: data.players }, { merge: true }));
+}
+
+// Firestore reference of one match
+function matchRef(id) { return doc(db, 'matches', id); }
+
+// Finds a match on screen by its id
+function findMatch(id) { return data.matches.find(m => m.id === id); }
 
 async function saveSettings() {
   settings.minMatches = parseInt(document.getElementById('minMatchesSetting').value) || 0;
@@ -814,14 +888,13 @@ function getH2H(p1, p2) {
   return { p1wins, p2wins, total, pct };
 }
 
+// Only matches that live in their own record (they have an id) can be confirmed or disputed
 function getPendingForPlayer(name) {
-  return data.matches.map((m, i) => ({ ...m, idx: i }))
-    .filter(m => m.status === 'provisional' && m.loser === name);
+  return data.matches.filter(m => m.id && m.status === 'provisional' && m.loser === name);
 }
 
 function getDisputedMatches() {
-  return data.matches.map((m, i) => ({ ...m, idx: i }))
-    .filter(m => m.status === 'disputed');
+  return data.matches.filter(m => m.id && m.status === 'disputed');
 }
 
 function getDateForOffset(offset) {
@@ -947,17 +1020,18 @@ async function deleteCategory(code) {
   On every data load — auto-confirm provisional matches
   from previous days
 ---------------------------------------------------------- */
+// A provisional match nobody disputed within 24 hours becomes confirmed.
+// The database rules check the 24 hours with the server's clock, so a wrong
+// device clock cannot confirm early. Each match is tried once per page load.
 async function autoApprovePreviousDays() {
   if (!isAdmin && !currentPid) return;          // only logged-in users may write
-  const today   = new Date().toLocaleDateString();
-  let changed   = false;
-  data.matches.forEach(m => {
-    if (m.status === 'provisional' && m.date !== today) {
-      m.status = 'confirmed';
-      changed  = true;
-    }
-  });
-  if (changed) await save();
+  const cutoff = Date.now() - DAY_MS - 5 * 60 * 1000;   // 5 minutes margin for clock drift
+  data.matches
+    .filter(m => m.id && m.status === 'provisional' && m.pendingSince < cutoff && !autoTried.has(m.id))
+    .forEach(m => {
+      autoTried.add(m.id);
+      updateDoc(matchRef(m.id), { status: 'confirmed' }).catch(() => {});
+    });
 }
 
 /* ----------------------------------------------------------
@@ -1022,8 +1096,8 @@ function showAdminDisputedModal() {
         <div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy || m.loser}</div>
       </div>
       <div class="approval-match-actions">
-        <button class="btn-act btn-act-confirm" onclick="adminResolveDispute(${m.idx},'confirm')">✅ Confirm</button>
-        <button class="btn-act btn-act-delete"  onclick="adminResolveDispute(${m.idx},'delete')">🗑️ Delete</button>
+        <button class="btn-act btn-act-confirm" onclick="adminResolveDispute('${m.id}','confirm')">✅ Confirm</button>
+        <button class="btn-act btn-act-delete"  onclick="adminResolveDispute('${m.id}','delete')">🗑️ Delete</button>
       </div>
     </div>`).join('');
   document.getElementById('admin-disputed-overlay').style.display = 'flex';
@@ -1031,15 +1105,12 @@ function showAdminDisputedModal() {
 function closeAdminDisputedModal() {
   document.getElementById('admin-disputed-overlay').style.display = 'none';
 }
-async function adminResolveDispute(index, action) {
+async function adminResolveDispute(id, action) {
   if (action === 'confirm') {
-    data.matches[index].status = 'confirmed';
-    showMessage('Match confirmed! ✅', 'success');
+    if (await sync(() => updateDoc(matchRef(id), { status: 'confirmed' }))) showMessage('Match confirmed! ✅', 'success');
   } else {
-    data.matches.splice(index, 1);
-    showMessage('Match deleted!', 'info');
+    if (await sync(() => deleteDoc(matchRef(id)))) showMessage('Match deleted!', 'info');
   }
-  await save();
   if (getDisputedMatches().length > 0) showAdminDisputedModal();
   else closeAdminDisputedModal();
 }
@@ -1100,13 +1171,13 @@ function showApprovalModal(playerName) {
   const pending = getPendingForPlayer(playerName);
   if (pending.length === 0) return;
   document.getElementById('approval-list').innerHTML = pending.map(m => `
-    <div class="approval-match-row" id="approval-row-${m.idx}">
+    <div class="approval-match-row" id="approval-row-${m.id}">
       <div class="approval-match-text">
         <span class="win">${getPlayerBadge(m.winner)}${m.winner}</span> says they beat you on <strong>${m.date}</strong>
       </div>
       <div class="approval-match-actions">
-        <button class="btn-act btn-act-confirm" onclick="approvalConfirm(${m.idx})">✅ Confirm</button>
-        <button class="btn-act btn-act-dispute" onclick="approvalDispute(${m.idx})">🚨 Dispute</button>
+        <button class="btn-act btn-act-confirm" onclick="approvalConfirm('${m.id}')">✅ Confirm</button>
+        <button class="btn-act btn-act-dispute" onclick="approvalDispute('${m.id}')">🚨 Dispute</button>
       </div>
     </div>`).join('');
   document.getElementById('approval-done-btn').style.display = 'none';
@@ -1116,18 +1187,15 @@ function checkApprovalDone() {
   if (getPendingForPlayer(currentPlayer).length === 0)
     document.getElementById('approval-done-btn').style.display = 'block';
 }
-async function approvalConfirm(index) {
-  data.matches[index].status = 'confirmed';
-  await save();
-  const row = document.getElementById('approval-row-' + index);
+async function approvalConfirm(id) {
+  if (!await sync(() => updateDoc(matchRef(id), { status: 'confirmed' }))) return;
+  const row = document.getElementById('approval-row-' + id);
   if (row) row.style.opacity = '0.4';
   checkApprovalDone();
 }
-async function approvalDispute(index) {
-  data.matches[index].status     = 'disputed';
-  data.matches[index].disputedBy = currentPlayer;
-  await save();
-  const row = document.getElementById('approval-row-' + index);
+async function approvalDispute(id) {
+  if (!await sync(() => updateDoc(matchRef(id), { status: 'disputed', disputedBy: currentPlayer }))) return;
+  const row = document.getElementById('approval-row-' + id);
   if (row) {
     row.style.opacity = '0.4';
     row.querySelector('.approval-match-actions').innerHTML =
@@ -1180,8 +1248,20 @@ async function logMatch() {
   if (duplicates.length >= 3) { showMessage('Maximum 3 pending matches between same players per day!', 'error'); return; }
 
   const status = isAdmin ? 'confirmed' : (loggedAsLoss ? 'confirmed' : 'provisional');
-  data.matches.push({ winner, loser, date: today, loggedBy: currentPlayer || 'admin', status });
-  await save();
+  const w = getPlayerObj(winner), l = getPlayerObj(loser);
+  if (!w || !w.pid || !l || !l.pid) { showMessage('This player has no login yet. Ask the admin!', 'error'); return; }
+  // One new document per match. createdAt keeps the ELO order, pendingSince starts the 24h dispute window;
+  // both use the server's clock (the database rules check this).
+  const ok = await sync(() => addDoc(matchesCol, {
+    winner, loser, winnerPid: w.pid, loserPid: l.pid,
+    date: today,
+    loggedBy:    currentPlayer || 'admin',
+    loggedByPid: isAdmin ? 'admin' : currentPid,
+    status,
+    createdAt:    serverTimestamp(),
+    pendingSince: serverTimestamp()
+  }));
+  if (!ok) return;
   logEvent(analytics, 'match_logged', { status, logged_by: currentPlayer || 'admin' });
 
   ['opponent','winner','loser'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -1196,50 +1276,56 @@ async function logMatch() {
 /* ----------------------------------------------------------
   9.10 Match actions
 ---------------------------------------------------------- */
-async function confirmMatch(index) {
-  data.matches[index].status = 'confirmed';
-  await save();
+async function confirmMatch(id) {
+  if (!await sync(() => updateDoc(matchRef(id), { status: 'confirmed' }))) return;
   logEvent(analytics, 'match_confirmed');
   showMessage('Match confirmed! ✅', 'success');
 }
 
-async function rejectMatch(index) {
-  const m = data.matches[index];
-  if (currentPlayer && m.loggedBy !== currentPlayer && m.loser === currentPlayer) {
+async function rejectMatch(id) {
+  const m = findMatch(id);
+  if (!m) return;
+  if (currentPid && m.loggedByPid !== currentPid && m.loserPid === currentPid) {
+    // 1. Opponent: a dispute goes to the admin
     if (!confirm('Dispute this match? It will be sent to admin for review.')) return;
-    data.matches[index].status     = 'disputed';
-    data.matches[index].disputedBy = currentPlayer;
-    await save();
-    showMessage('Match disputed — admin will review! 🚨', 'info');
+    if (await sync(() => updateDoc(matchRef(id), { status: 'disputed', disputedBy: currentPlayer })))
+      showMessage('Match disputed — admin will review! 🚨', 'info');
   } else {
+    // 2. Creator (or admin): delete
     if (!confirm('Delete this match?')) return;
-    data.matches.splice(index, 1);
-    await save();
-    showMessage('Match deleted!', 'info');
+    if (await sync(() => deleteDoc(matchRef(id)))) showMessage('Match deleted!', 'info');
   }
 }
 
-async function deleteMatch(index) {
+async function deleteMatch(id) {
   if (!confirm('Delete this match?')) return;
-  data.matches.splice(index, 1);
-  await save();
+  await sync(() => deleteDoc(matchRef(id)));
   editingMatch = null;
 }
 
-function startEditMatch(index) {
-  editingMatch = editingMatch === index ? null : index;
+function startEditMatch(id) {
+  editingMatch = editingMatch === id ? null : id;
   render();
 }
 
-async function saveEditMatch(index) {
-  const newWinner = document.getElementById('edit-winner-' + index).value;
-  const newLoser  = document.getElementById('edit-loser-'  + index).value;
+// Correct a match. The admin can change anything. A player can only correct a match they
+// logged and must stay one of the two players: if they become the winner, the match goes
+// back to provisional so the opponent can confirm or dispute it (same as logging a win).
+async function saveEditMatch(id) {
+  const newWinner = document.getElementById('edit-winner-' + id).value;
+  const newLoser  = document.getElementById('edit-loser-'  + id).value;
   if (!newWinner || !newLoser || newWinner === newLoser) { showMessage('Pick two different players!', 'error'); return; }
-  data.matches[index].winner = newWinner;
-  data.matches[index].loser  = newLoser;
-  await save();
+  const w = getPlayerObj(newWinner), l = getPlayerObj(newLoser);
+  if (!w || !w.pid || !l || !l.pid) { showMessage('This player has no login yet. Ask the admin!', 'error'); return; }
+  const upd = { winner: newWinner, loser: newLoser, winnerPid: w.pid, loserPid: l.pid };
+  if (!isAdmin) {
+    if (currentPid !== w.pid && currentPid !== l.pid) { showMessage('You must be one of the two players!', 'error'); return; }
+    upd.status       = currentPid === l.pid ? 'confirmed' : 'provisional';
+    upd.pendingSince = serverTimestamp();
+  }
+  if (!await sync(() => updateDoc(matchRef(id), upd))) return;
   editingMatch = null;
-  showMessage('Match updated!', 'success');
+  showMessage(upd.status === 'provisional' ? 'Match updated! ⏳ ' + newLoser + ' can confirm or dispute' : 'Match updated!', 'success');
 }
 
 function openH2H(p1, p2) {
@@ -1312,7 +1398,7 @@ async function addPlayer() {
     await createLogin(player, password);          // 1. secure login first
   } catch(e) { showMessage('Could not create login: ' + e.code, 'error'); return; }
   data.players.push(player);
-  await save();                                    // 2. then the player record
+  await savePlayers();                             // 2. then the player record
   document.getElementById('newPlayer').value         = '';
   document.getElementById('newPlayerLang').value     = '';
   document.getElementById('newPlayerPassword').value = '';
@@ -1324,7 +1410,7 @@ async function deletePlayer(name) {
   if (!confirm('Delete ' + name + '?')) return;
   const p = data.players.find(x => x.name === name);
   data.players = data.players.filter(x => x.name !== name);
-  await save();
+  await savePlayers();                             // their matches stay (shown under the stored name)
   if (p && p.pid) {                                // remove the login mapping so the old login stops working
     try {
       const old = await getDoc(doc(db, 'playerAuth', p.pid));
@@ -1332,6 +1418,7 @@ async function deletePlayer(name) {
       await deleteDoc(doc(db, 'playerAuth',   p.pid));
       await deleteDoc(doc(db, 'playerEmails', p.pid));
       await deleteDoc(doc(db, 'resets',       p.pid));
+      await deleteDoc(doc(db, 'logins',       p.pid));   // nobody can log new matches against them
     } catch(e) {}
   }
 }
@@ -1360,6 +1447,9 @@ async function saveEditPlayer(oldName) {
       data.players.find(p => p.name.toLowerCase() === newName.toLowerCase())) {
     showMessage('Player already exists!', 'error'); return;
   }
+  if (newName !== oldName && legacyMatches.length > 0) {
+    showMessage('Press "3. Move matches to separate records" first, then rename.', 'error'); return;
+  }
   const player = data.players.find(p => p.name === oldName);
   if (newPass) {                                   // admin sets a new password = brand new login
     try { await createLogin(player, newPass); }
@@ -1368,13 +1458,9 @@ async function saveEditPlayer(oldName) {
   // only touch the email if its box was loaded (never wipe it by accident)
   if (player.pid && editEmailDraft[oldName] !== undefined) await writeEmail(player.pid, editEmailDraft[oldName].trim());
   delete editEmailDraft[oldName];
+  // Matches find the new name through the player id, so they need no change
   data.players = data.players.map(p => p.name === oldName ? { ...p, name: newName, lang: newLang } : p);
-  data.matches = data.matches.map(m => ({
-    ...m,
-    winner: m.winner === oldName ? newName : m.winner,
-    loser:  m.loser  === oldName ? newName : m.loser
-  }));
-  await save();
+  await savePlayers();
   editingPlayer = null;
   showMessage('Player updated!', 'success');
 }
@@ -1405,6 +1491,7 @@ function historyNextDay() { if (historyDayOffset < 0) { historyDayOffset++; rend
   9.13 Data export / import / reset
 ---------------------------------------------------------- */
 function exportData() {
+  // matches include ids, player ids and times (milliseconds) so an import keeps the order
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -1426,11 +1513,17 @@ async function importData(event) {
       const imported = JSON.parse(e.target.result);
       if (!imported.players || !imported.matches) { showMessage('Invalid file!', 'error'); return; }
       if (!confirm('This will replace all current data. Are you sure?')) return;
-      data = imported;
-      data.players = data.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
-      await save();
+      const players = imported.players.map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+      players.forEach(p => { if (!p.pid) p.pid = newId(); });
+      const docs = toMatchDocs(imported.matches, players);
+      setSyncStatus('syncing');
+      await deleteAllMatches();                                   // 1. empty the match records
+      await writeMatchDocs(docs);                                 // 2. write the imported ones
+      await setDoc(dataRef, { players });                         // 3. player list (also drops any old list)
+      await writeLoginDocs(players);                              // 4. make every player a valid opponent
+      setSyncStatus('live');
       logEvent(analytics, 'data_imported');
-      showMessage('Imported! ' + data.players.length + ' players, ' + data.matches.length + ' matches.', 'success');
+      showMessage('Imported! ' + players.length + ' players, ' + docs.length + ' matches.', 'success');
     } catch(err) { showMessage('Error reading file!', 'error'); }
   };
   reader.readAsText(file);
@@ -1440,8 +1533,10 @@ async function importData(event) {
 async function resetData() {
   if (!confirm('Reset ALL data? This cannot be undone!')) return;
   if (!confirm('Are you absolutely sure?')) return;
-  data = { players: [], matches: [] };
-  await save();
+  await sync(async () => {
+    await deleteAllMatches();
+    await setDoc(dataRef, { players: [] });
+  });
   showMessage('All data reset.', 'info');
 }
 
@@ -1843,8 +1938,8 @@ function render() {
             <span style="color:#475569;font-size:12px;margin-left:4px">${m.date}</span>
           </span>
           <div class="btn-actions">
-            <button class="btn-act btn-act-confirm" onclick="confirmMatch(${m.idx})">✅ Confirm</button>
-            <button class="btn-act btn-act-dispute" onclick="rejectMatch(${m.idx})">🚨 Dispute</button>
+            <button class="btn-act btn-act-confirm" onclick="confirmMatch('${m.id}')">✅ Confirm</button>
+            <button class="btn-act btn-act-dispute" onclick="rejectMatch('${m.id}')">🚨 Dispute</button>
           </div>
         </div>`).join('');
     } else { pendingSection.style.display = 'none'; }
@@ -1863,8 +1958,8 @@ function render() {
             <br><span style="color:#ef4444;font-size:11px">⚠️ Disputed by ${m.disputedBy||m.loser}</span>
           </span>
           <div class="btn-actions">
-            <button class="btn-act btn-act-confirm" onclick="adminResolveDispute(${m.idx},'confirm')">✅ Confirm</button>
-            <button class="btn-act btn-act-delete"  onclick="adminResolveDispute(${m.idx},'delete')">🗑️ Delete</button>
+            <button class="btn-act btn-act-confirm" onclick="adminResolveDispute('${m.id}','confirm')">✅ Confirm</button>
+            <button class="btn-act btn-act-delete"  onclick="adminResolveDispute('${m.id}','delete')">🗑️ Delete</button>
           </div>
         </div>`).join('');
     } else { disputedSection.style.display = 'none'; }
@@ -1883,12 +1978,15 @@ function render() {
     hl.innerHTML = '<div class="empty">No matches on this day.</div>';
   } else {
     hl.innerHTML = dayMatches.map(m => {
-      const i             = m.origIdx;
+      const i             = m.origIdx;                       // position, for the ELO change
+      const id            = m.id;                            // record id, for the buttons
       const isProvisional = m.status === 'provisional';
       const isDisputed    = m.status === 'disputed';
-      const canEdit       = isAdmin || (currentPlayer && (m.winner===currentPlayer||m.loser===currentPlayer));
-      const canDelete     = isAdmin || (currentPlayer && m.loggedBy===currentPlayer);
-      const isEditing     = editingMatch === i;
+      const isMine        = !!(currentPid && m.loggedByPid === currentPid);   // I logged it
+      const canAct        = !!id;                            // old list (before migration) is read-only
+      const canEdit       = canAct && (isAdmin || isMine);
+      const canDelete     = canAct && (isAdmin || isMine);
+      const isEditing     = canAct && editingMatch === id;
       const eloChange     = eloChanges[i];
 
       let statusBadge = '';
@@ -1898,13 +1996,13 @@ function render() {
       let editSection = '';
       if (isEditing && canEdit) {
         editSection = `<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
-          <select id="edit-winner-${i}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
+          <select id="edit-winner-${id}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
             ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.winner?'selected':''}>${p.name}</option>`).join('')}
           </select>
-          <select id="edit-loser-${i}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
+          <select id="edit-loser-${id}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
             ${data.players.map(p=>`<option value="${p.name}" ${p.name===m.loser?'selected':''}>${p.name}</option>`).join('')}
           </select>
-          <button class="btn-act btn-act-confirm" onclick="saveEditMatch(${i})">Save</button>
+          <button class="btn-act btn-act-confirm" onclick="saveEditMatch('${id}')">Save</button>
         </div>`;
       }
 
@@ -1918,10 +2016,10 @@ function render() {
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <span style="color:#475569;font-size:12px">${m.date}</span>
             ${eloChange?`<span class="elo-change-win">+${eloChange.winner}</span><span style="color:#475569;font-size:11px">/</span><span class="elo-change-loss">${eloChange.loser}</span>`:''}
-            ${isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch(${i})">🗑️</button>`:''}
-            ${isProvisional&&currentPlayer&&m.loser===currentPlayer?`<button class="btn-act btn-act-confirm" onclick="confirmMatch(${i})">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch(${i})">🚨</button>`:''}
-            ${canEdit&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch(${i})">✏️</button>`:''}
-            ${canDelete&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="${isAdmin?'deleteMatch':'rejectMatch'}(${i})">🗑️</button>`:''}
+            ${canAct&&isProvisional&&isAdmin?`<button class="btn-act btn-act-confirm" onclick="confirmMatch('${id}')">✅</button><button class="btn-act btn-act-delete" onclick="rejectMatch('${id}')">🗑️</button>`:''}
+            ${canAct&&isProvisional&&currentPid&&m.loserPid===currentPid&&!isMine?`<button class="btn-act btn-act-confirm" onclick="confirmMatch('${id}')">✅</button><button class="btn-act btn-act-dispute" onclick="rejectMatch('${id}')">🚨</button>`:''}
+            ${canEdit&&!isProvisional&&!isDisputed?`<button class="btn-act btn-act-edit" onclick="startEditMatch('${id}')">✏️</button>`:''}
+            ${canDelete&&!isDisputed?`<button class="btn-act btn-act-delete" onclick="${isAdmin?'deleteMatch':'rejectMatch'}('${id}')">🗑️</button>`:''}
           </div>
         </div>
         ${isDisputed?`<div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${m.disputedBy||m.loser} — waiting for admin</div>`:''}
@@ -1995,7 +2093,7 @@ const ADMIN_ALIAS  = 'admin@' + ALIAS_DOMAIN;
 function pad(pw)        { return PW_PREFIX + pw; }
 function newId()        { return crypto.randomUUID().replace(/-/g, '').slice(0, 16); }
 function aliasOf(pid, av) { return pid + 'v' + av + '@' + ALIAS_DOMAIN; }
-function aliasFor(p)    { return aliasOf(p.pid, p.av || 1); }
+function aliasFor(p)    { return aliasOf(p.pid, loginAvs[p.pid] || p.av || 1); }   // logins/<pid> wins over the player list
 function authError(e)   { return (e && e.code) ? e.code.replace('auth/', '') : 'error'; }
 
 /* 9.17.2 Auth state — restores the login after a page reload */
@@ -2032,6 +2130,7 @@ async function createLogin(p, password) {
   if (old.exists()) await deleteDoc(doc(db, 'authMap', old.data().uid));  // old login stops working
   await setDoc(doc(db, 'authMap', uid),           { pid: p.pid });
   await setDoc(doc(db, 'playerAuth', p.pid),      { uid });
+  await setDoc(doc(db, 'logins', p.pid),          { av });
   p.av = av;
   return uid;
 }
@@ -2051,7 +2150,7 @@ async function migratePlayers() {
     try { await createLogin(p, pw); done++; status.textContent = 'Migrating... ' + done; }
     catch(e) { failed.push(p.name + ' (' + authError(e) + ')'); }
   }
-  await save();
+  await savePlayers();
   status.textContent = 'Migrated: ' + done +
     (skipped.length ? ' · no old password: ' + skipped.join(', ') : '') +
     (failed.length  ? ' · failed: ' + failed.join(', ') : '');
@@ -2215,19 +2314,17 @@ async function completeReset() {
   if (pw1 !== pw2)    { showMessage('Passwords do not match!', 'error'); return; }
   const user = resetAuth.currentUser;
   try {
-    // 1. fresh data (so we do not overwrite anybody's newest match)
-    const snap = await getDoc(doc(resetDb, 'gamestats', 'data'));
-    const d    = snap.data();
-    const p    = d.players.find(x => x.pid === pid);
-    const av   = (p.av || 1) + 1;
+    // 1. current login version of this player
+    const p    = data.players.find(x => x.pid === pid);
+    const lv   = await getDoc(doc(resetDb, 'logins', pid));
+    const av   = ((lv.exists() ? lv.data().av : p.av) || 1) + 1;
     // 2. turn the anonymous identity into the player's new login (same uid)
     await linkWithCredential(user, EmailAuthProvider.credential(aliasOf(pid, av), pad(pw1)));
     // 3. take over the player: map the new login, then switch off the old one
     const old = await getDoc(doc(resetDb, 'playerAuth', pid));
     await setDoc(doc(resetDb, 'authMap', user.uid), { pid });
     await setDoc(doc(resetDb, 'playerAuth', pid), { uid: user.uid });
-    p.av = av;
-    await setDoc(doc(resetDb, 'gamestats', 'data'), { players: d.players, matches: d.matches });
+    await setDoc(doc(resetDb, 'logins', pid), { av });   // the login screen now uses the new address
     if (old.exists()) await deleteDoc(doc(resetDb, 'authMap', old.data().uid));
     await deleteDoc(doc(resetDb, 'resets', pid));
     await signOut(resetAuth);
@@ -2259,6 +2356,121 @@ function renderResetRequests() {
         <button class="btn-act btn-act-delete" onclick="denyReset('${pid}')">🗑️</button>
       </div></div></div>`;
   }).join('');
+}
+
+/* ----------------------------------------------------------
+  9.18 Separate match records (one-off migration + helpers)
+  Before: every match lived in one shared list inside gamestats/data,
+  so any logged-in player could rewrite all of them.
+  After: each match is its own document in matches/<id>, and the
+  database rules decide per match who may change it.
+  9.18.1 Convert a list of old-style matches into documents
+  9.18.2 Batch helpers (write / delete many documents)
+  9.18.3 The migration button
+---------------------------------------------------------- */
+
+// 9.18.1 Old-style list -> documents. Used by the migration and by Import.
+//        - player ids are looked up from the names (or kept, if the list already has them)
+//        - createdAt is a tiny made-up time (1970 + position) so old matches always come
+//          first and in their original order: that order decides the ELO ratings
+//        - provisional matches from earlier days are confirmed, as the old app did
+function toMatchDocs(list, players) {
+  const byName = name => { const p = players.find(x => x.name === name); return p ? p.pid : null; };
+  const known  = pid  => players.some(x => x.pid && x.pid === pid);
+  const today  = new Date().toLocaleDateString();
+  const now    = Timestamp.now();
+  return list.map((m, i) => {
+    let status = m.status || 'confirmed';
+    if (status === 'provisional' && m.date !== today) status = 'confirmed';
+    const loggedByPid = (!m.loggedBy || m.loggedBy === 'admin') ? 'admin'
+      : (known(m.loggedByPid) ? m.loggedByPid : byName(m.loggedBy));
+    const d = {
+      winner:       m.winner,
+      loser:        m.loser,
+      winnerPid:    known(m.winnerPid) ? m.winnerPid : byName(m.winner),
+      loserPid:     known(m.loserPid)  ? m.loserPid  : byName(m.loser),
+      date:         m.date || '',
+      loggedBy:     m.loggedBy || 'admin',
+      loggedByPid:  loggedByPid || null,
+      status,
+      createdAt:    Timestamp.fromMillis(typeof m.createdAt === 'number' ? m.createdAt : i + 1),
+      pendingSince: typeof m.pendingSince === 'number' ? Timestamp.fromMillis(m.pendingSince) : now
+    };
+    if (m.disputedBy) d.disputedBy = m.disputedBy;
+    // fixed ids: pressing the migration twice overwrites the same records instead of doubling them
+    return { id: 'legacy-' + String(i).padStart(5, '0'), data: d };
+  });
+}
+
+// 9.18.2 Firestore accepts at most 500 writes per batch; 400 keeps a margin
+async function writeMatchDocs(docs) {
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + 400).forEach(x => batch.set(matchRef(x.id), x.data));
+    await batch.commit();
+  }
+}
+async function deleteAllMatches() {
+  const snap = await getDocs(matchesCol);
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+// logins/<pid> = { av } for every player: the login screen reads it, and the rules use it
+// to check that an opponent is a real player
+async function writeLoginDocs(players) {
+  const batch = writeBatch(db);
+  players.filter(p => p.pid).forEach(p => batch.set(doc(db, 'logins', p.pid), { av: loginAvs[p.pid] || p.av || 0 }));
+  await batch.commit();
+}
+
+// 9.18.3 Migration: run once by the admin after uploading this version
+async function migrateMatches() {
+  if (!isAdmin) return;
+  const status = document.getElementById('match-migration-status');
+  const say    = t => { status.textContent = t; };
+  try {
+    // 1. Read the old list fresh from the database
+    const snap    = await getDoc(dataRef);
+    const d       = snap.exists() ? snap.data() : {};
+    const old     = d.matches || [];
+    const players = (d.players || []).map(p => typeof p === 'string' ? { name: p, lang: '' } : p);
+    if (old.length === 0) { say('Nothing to move: matches already live in separate records ✅'); return; }
+    if (!confirm('Move ' + old.length + ' matches into separate records? A backup of the old list is kept.')) return;
+
+    // 2. Safety copy of the old list (admin-only document gamestats/legacyMatches)
+    say('1/5 Saving a backup...');
+    await setDoc(legacyBackupRef, { matches: old, players, savedAt: Date.now() });
+
+    // 3. Every player needs a permanent id, because matches now point to ids, not names
+    say('2/5 Checking player ids...');
+    players.forEach(p => { if (!p.pid) p.pid = newId(); });
+    await updateDoc(dataRef, { players });
+    await writeLoginDocs(players);
+
+    // 4. One document per match
+    say('3/5 Copying ' + old.length + ' matches...');
+    const docs = toMatchDocs(old, players);
+    await writeMatchDocs(docs);
+
+    // 5. Check that every copy arrived before touching the old list
+    say('4/5 Checking the copies...');
+    const check   = await getDocs(matchesCol);
+    const have    = new Set(check.docs.map(x => x.id));
+    const missing = docs.filter(x => !have.has(x.id)).length;
+    if (missing > 0) { say('Stopped: ' + missing + ' matches were not copied. The old list is untouched, press again.'); return; }
+
+    // 6. Remove the old list from the shared document (the backup stays)
+    say('5/5 Removing the old shared list...');
+    await updateDoc(dataRef, { matches: deleteField() });
+    say('Done ✅ ' + docs.length + ' matches moved. Backup kept in gamestats/legacyMatches.');
+    showMessage('Matches moved ✅', 'success');
+  } catch(e) {
+    console.warn('Match migration failed:', e.code || e.message);
+    say('Failed: ' + (e.code || e.message) + '. Nothing was lost; the old list is only removed at the very end.');
+  }
 }
 
 /* ----------------------------------------------------------
@@ -2315,6 +2527,7 @@ window.toggleEditCatInputs    = toggleEditCatInputs;
 window.editEmailDraft         = editEmailDraft;
 window.migratePlayers         = migratePlayers;
 window.deleteLegacyPasswords  = deleteLegacyPasswords;
+window.migrateMatches         = migrateMatches;
 window.saveMyEmail            = saveMyEmail;
 window.showResetModal         = showResetModal;
 window.hideResetModal         = hideResetModal;

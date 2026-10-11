@@ -33,7 +33,7 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 ### 📋 History
 - Full match history with ELO points won/lost per match
 - Pending matches shown with confirm/reject buttons
-- Players can edit or delete their own matches
+- Players can edit or delete the matches they logged themselves
 - Admin can edit, delete, confirm or reject any match
 
 ### 👥 Players
@@ -53,7 +53,9 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 - Logins use Firebase Authentication: passwords are hashed by Google and can never be read back
 - Players still just pick their name and type their password (a hidden login address is used behind the scenes)
 - Optional private recovery email lets players reset their own password; otherwise the admin approves a reset request
-- Firestore security rules: everyone can read stats, only logged-in players can save matches, only the admin can change settings
+- Each match is its own database record: a player can only log matches they played in, only the opponent can confirm or dispute, only the player who logged a match (or the admin) can edit or delete it
+- A logged win stays provisional until the opponent confirms; undisputed matches confirm themselves after 24 hours (checked with the server's clock)
+- Firestore security rules: everyone can read stats, only the admin can change players, settings and categories
 - API key restricted to GitHub Pages domain only
 
 ---
@@ -132,9 +134,14 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 ## Firebase Structure
 ```
 gamestats/
-  data        → players array (name, lang, pid, av) and matches array
-  settings    → leaderboard settings (min matches threshold)
-  categories  → category list
+  data           → players array (name, lang, pid, av)
+  settings       → leaderboard settings (min matches threshold)
+  categories     → category list
+  legacyMatches  → backup of the old single match list (admin only)
+
+matches/<id>          → one match: winner, loser, winnerPid, loserPid, date, loggedBy,
+                        loggedByPid, status, disputedBy, createdAt, pendingSince
+logins/<pid>          → { av } which hidden login address the player uses (public)
 
 admins/<uid>          → marks the admin login (created by hand in the console)
 authMap/<uid>         → { pid }  which login belongs to which player
@@ -177,7 +184,8 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 ## Roadmap
 
-- [ ] Firebase Authentication for proper user management
+- [x] Firebase Authentication for proper user management
+- [x] One database record per match
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
 - [ ] Tournament bracket mode
