@@ -436,6 +436,10 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <label>Min matches to appear in leaderboard</label>
           <input type="number" id="minMatchesSetting" min="0" max="50" value="0" onchange="saveSettings()">
         </div>
+        <div class="setting-row">
+          <label>Max unconfirmed wins per pair, per game, per day</label>
+          <input type="number" id="maxPendingSetting" min="1" max="100" value="10" onchange="saveSettings()">
+        </div>
 
         <hr class="divider">
 
@@ -778,7 +782,7 @@ const autoTried     = new Set(); // matches this browser already tried to auto-c
 const DAY_MS        = 24 * 60 * 60 * 1000;
 // App version shown in the footer. Scheme: major.minor. A new major is a whole number (5 -> 6);
 // every smaller change adds to the part after the dot (5.2 -> 5.3).
-const APP_VERSION   = '5.3';
+const APP_VERSION   = '5.4';
 let joinRequests    = {};     // admin only: requestId -> join request (9.20)
 let unsubRequests   = null;   // stops the admin's requests listener on logout
 let notes           = {};     // admin only: adminNotes/<id> (9.21.2)
@@ -796,6 +800,8 @@ onSnapshot(settingsRef, (snap) => {
     settings = snap.data();
     const el = document.getElementById('minMatchesSetting');
     if (el) el.value = settings.minMatches || 0;
+    const mp = document.getElementById('maxPendingSetting');
+    if (mp) mp.value = maxPendingPerDay();
   }
   render();
 });
@@ -943,6 +949,7 @@ function findMatch(id) { return data.matches.find(m => m.id === id); }
 
 async function saveSettings() {
   settings.minMatches = parseInt(document.getElementById('minMatchesSetting').value) || 0;
+  settings.maxPending = Math.min(100, Math.max(1, parseInt(document.getElementById('maxPendingSetting').value) || 10));
   await setDoc(settingsRef, settings);
   render();
 }
@@ -979,6 +986,11 @@ function getPlayerBadge(name) {
   if (!p || !p.lang) return '';
   return getCategoryBadge(p.lang);
 }
+
+// How many unconfirmed (provisional) wins one pair may log per game per day. Admin setting, default 10.
+// Only logged WINS wait for confirmation; logged losses are confirmed at once and never count here.
+// The limit is a courtesy check in the app, not a database rule.
+function maxPendingPerDay() { return Math.min(100, Math.max(1, parseInt(settings.maxPending) || 10)); }
 
 // Matches of the game on screen (every stat below is per game)
 function gameMatches() { return data.matches.filter(m => m.gameId === currentGameId); }
@@ -1412,7 +1424,7 @@ function scrollToPending() {
   - Player logs LOSS  → confirmed immediately
   - Player logs WIN   → provisional (counts, loser can dispute)
   - Admin logs any    → confirmed immediately
-  - Max 3 provisional per pair per day
+  - Max N provisional (unconfirmed) wins per pair per game per day; N is an admin setting (default 10)
 ---------------------------------------------------------- */
 async function logMatch() {
   let winner, loser, loggedAsLoss = false;
@@ -1439,7 +1451,9 @@ async function logMatch() {
     ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
     todayKeys.includes(m.date)
   );
-  if (duplicates.length >= 3) { showMessage('Maximum 3 pending matches between same players per day!', 'error'); return; }
+  const maxPending = maxPendingPerDay();
+  // only a logged WIN waits for confirmation, so only wins are held back; losses and admin entries are confirmed at once
+  if (!isAdmin && !loggedAsLoss && duplicates.length >= maxPending) { showMessage('Maximum ' + maxPending + ' unconfirmed matches between the same players per day. Ask your opponent to confirm some!', 'error'); return; }
 
   const status = isAdmin ? 'confirmed' : (loggedAsLoss ? 'confirmed' : 'provisional');
   const w = getPlayerObj(winner), l = getPlayerObj(loser);
@@ -1762,7 +1776,7 @@ function switchTab(tab, btn) {
   currentTab = tab;
   trackScreen(tab);
   if (tab === 'players') {
-    setTimeout(() => { const el = document.getElementById('minMatchesSetting'); if (el) el.value = settings.minMatches || 0; }, 50);
+    setTimeout(() => { const el = document.getElementById('minMatchesSetting'); if (el) el.value = settings.minMatches || 0; const mp = document.getElementById('maxPendingSetting'); if (mp) mp.value = maxPendingPerDay(); }, 50);
   }
   render();
 }

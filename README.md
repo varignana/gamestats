@@ -30,10 +30,10 @@ A real-time match tracker for office games (pool, table tennis, and any game the
 ### 📈 Usage statistics (Google Analytics 4)
 - Every section you open (stats, odds, log, history, players, head to head) sends a `screen_view`, and leaving it sends a `section_time` event with the seconds spent (capped at 30 minutes per visit)
 - Each event carries `game`, `category` (the filter on screen), `desk` (the player's own category) and `player` (name); the player's random id is the GA user id. In GA4 you can then total time per section, per desk, per game, per player, or any combination
-- Setup in GA4 (once): Admin → Custom definitions → event-scoped dimensions `game`, `category`, `desk`, `player`, `section`, and a custom metric `seconds` (unit: seconds). See SETUP-GUIDE.md. Colleagues are told by the admin; there is no on-page notice
+- Setup in GA4 (once): Admin → Custom definitions → event-scoped dimensions `game`, `category`, `desk`, `player`, `section`, and a custom metric `seconds` (unit: seconds). Click-by-click: GOOGLE-ANALYTICS-GUIDE.md. Colleagues are told by the admin; there is no on-page notice
 
 ### 🏷️ Version
-- The app version is shown at the bottom of the page (`Game Stats v5.2`). Scheme: major.minor. A big change is a new whole number (5 → 6), every smaller update adds to the number after the dot (5.2 → 5.3). It lives in one constant, `APP_VERSION`, in `index.html`
+- The app version is shown at the bottom of the page (for example `Game Stats v5.4`). Scheme: major.minor. A big change is a new whole number (5 → 6), every smaller update adds to the number after the dot (5.3 → 5.4). It lives in one constant, `APP_VERSION`, in `index.html`
 
 ### 🏆 Leaderboard
 - ELO rating system — the same used in chess and football
@@ -55,7 +55,7 @@ A real-time match tracker for office games (pool, table tennis, and any game the
 - Select if you won or lost, then pick your opponent
 - Matches go pending until the opponent confirms
 - Admin can log any match instantly as confirmed
-- Duplicate match detection — max 3 pending matches per pair per day
+- Unconfirmed-win guard: max N unconfirmed wins per pair, per game, per day (admin setting in Players → Settings, default 10). Confirmed matches and logged losses never count, so there is no daily limit on matches played
 
 ### 📋 History
 - Full match history with ELO points won/lost per match
@@ -240,6 +240,7 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 - [x] Several games in one portal (pool, table tennis, ...)
 - [x] Self-service join requests with admin approval (5.2)
 - [x] Default games for new joiners, admin notes, per-section usage statistics (5.3)
+- [x] Adjustable unconfirmed-win limit (5.4)
 - [ ] Per-game scoring (sets/points) and doubles
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
