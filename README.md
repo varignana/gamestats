@@ -1,6 +1,6 @@
-# 🎱 Game Stats
+# 🎯 Game Stats
 
-A real-time pool/billiards match tracker for office colleagues. Track wins, losses, ELO ratings, head-to-head stats, match odds and language team rivalries — all shared live across any device.
+A real-time match tracker for office games (pool, table tennis, and any game the admin adds). Track wins, losses, ELO ratings, head-to-head stats, match odds and category rivalries — all shared live across any device.
 
 **[▶ Open the App](https://varignana.github.io/gamestats)**
 
@@ -8,11 +8,20 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 
 ## Features
 
+### 🎮 Games
+- One portal, several games: chips under the title switch between them (shown once there is more than one active game)
+- Every game has its own leaderboard, odds, history and ELO. A player's name, flag and login are shared by all games
+- A player starts in each new game at that game's starting ELO (1000), because ratings are always worked out from the game's own matches
+- When the admin adds a game, each player gets a pop-up once, with **Join** or **No thanks**. Not joined games stay reachable from the chips (marked JOIN)
+- The game a player opened or logged a match in last is remembered in their account (any device), with the device's own last game as fallback when logged out
+- Admin: add a game (name, icon, description, ELO K-factor and starting ELO), edit it, archive or restore it. Games are never deleted: an archived game disappears from the switcher and takes no new matches, its history stays
+- Pool is the built-in first game: matches logged before games existed (no `gameId`) count as pool, so nothing had to be migrated
+
 ### 🏆 Leaderboard
 - ELO rating system — the same used in chess and football
 - Ranked by ELO, showing win/loss record and win percentage
 - Expandable player cards with head-to-head stats against every opponent
-- Language team filter (English, Italian, French, German, Portuguese)
+- Category filter (language teams, departments, anything the admin defines)
 - Minimum matches threshold to prevent new players jumping to the top
 
 ### 🎯 Odds
@@ -39,7 +48,7 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 
 ### 👥 Players
 - Admin protected panel for managing players
-- Add players with language team and initial password
+- Add players with category, games they play and initial password
 - Edit name, language and password
 - ELO rating shown per player
 - Players can change their own password in My Account
@@ -59,7 +68,8 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 - Every player name, category label and database id is escaped before it is put into the page, so a name containing HTML or script code is shown as plain text and never runs
 - Match dates are stored as `YYYY-MM-DD`, identical on every phone whatever its language or region settings
 - No plain-text passwords are stored anywhere: the old `admin/` documents were removed
-- Firestore security rules: everyone can read stats, only the admin can change players, settings and categories
+- Firestore security rules: everyone can read stats, only the admin can change players, settings, categories and games
+- A match can only be logged in an active game; a player can only edit their own game membership; games can never be deleted
 - API key restricted to GitHub Pages domain only
 
 ---
@@ -91,7 +101,7 @@ A real-time pool/billiards match tracker for office colleagues. Track wins, loss
 
 ## ELO Rating System
 
-Everyone starts at **1000 ELO**. The rating updates after every confirmed match using the standard ELO formula:
+Everyone starts at **1000 ELO** in each game (the admin can set another start and K-factor per game; table tennis uses the same 32 / 1000 as pool for now). The rating updates after every confirmed match using the standard ELO formula:
 ```
 Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400))
 New ELO = current ELO + 32 × (result - expected score)
@@ -108,7 +118,7 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 - **Firebase Analytics (GA4)** — user behaviour tracking
 - **GitHub Pages** — free hosting
 - **flagcdn.com** — flag images
-- **ELO rating system** — K-factor 32, base 1000
+- **ELO rating system** — K-factor and base are stored per game (default 32 / 1000)
 
 ---
 
@@ -132,6 +142,9 @@ Where result is 1 for a win and 0 for a loss. The K-factor of 32 means ratings m
 | `data_exported` | Data exported as JSON |
 | `data_imported` | Data imported from JSON |
 | `player_added` | New player added by admin |
+| `game_switched` | Game chip tapped (includes game) |
+| `game_joined` | Player joined a game (includes game) |
+| `game_added` | Admin added a game (includes game) |
 
 ---
 
@@ -142,7 +155,13 @@ gamestats/
   settings       → leaderboard settings (min matches threshold)
   categories     → category list
 
-matches/<id>          → one match: winner, loser, winnerPid, loserPid, date (YYYY-MM-DD), loggedBy,
+games/<id>            → one game: name, emoji, description, status (active/archived), order,
+                        rules { eloK, eloBase, scoring, format }, createdAt. Admin writes, never deleted.
+                        The id (e.g. "pool", "table-tennis") never changes, even if the game is renamed.
+playerGames/<pid>     → { joined: [gameIds], lastGame, declined: [gameIds] }. The player (or admin) writes it.
+                        No document = pool player only (how everybody started).
+
+matches/<id>          → one match: gameId (missing = pool), winner, loser, winnerPid, loserPid, date (YYYY-MM-DD), loggedBy,
                         loggedByPid, status, disputedBy, createdAt, pendingSince
 logins/<pid>          → { av } which hidden login address the player uses (public)
 
@@ -172,7 +191,7 @@ If you want to run your own copy:
 9. In Firestore create collection `admins` → document id = that User UID (add any field, for example `createdAt` = a number)
 10. Restrict your API key to your domain in Google Cloud Console
 11. Host on GitHub Pages or any static hosting
-12. Log in as admin → Players tab → add your players (each gets a secure login)
+12. Log in as admin → Players tab → add your players (each gets a secure login). The first admin login also creates the built-in `pool` game; add more games in the **🎮 Games** panel
 
 ---
 
@@ -195,10 +214,12 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 - [x] One database record per match
 - [x] Admin-only delete, escaped player names, ISO dates
 - [x] Legacy migration tools and plain-text passwords removed
+- [x] Several games in one portal (pool, table tennis, ...)
+- [ ] Per-game scoring (sets/points) and doubles
 - [ ] Push notifications for pending match confirmations
 - [ ] Monthly/weekly stat snapshots
 - [ ] Tournament bracket mode
 
 ---
 
-*Built with 🎱 Claude AI and a lot of pool matches*
+*Built with 🎯 Claude AI and a lot of pool and table tennis matches*

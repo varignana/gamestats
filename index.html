@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎱 Game Stats</title>
+<title>🎯 Game Stats</title>
 
 <!-- ============================================================
   SECTION 1 — STYLES
@@ -16,6 +16,7 @@
   1.7 Modals
   1.8 History Navigation
   1.9 Animations
+  1.10 Game switcher
 ============================================================ -->
 <style>
 
@@ -165,6 +166,16 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 .result-btn.active-lost { background:#ef4444; color:white; }
 .result-btn.inactive    { background:#1e293b; color:#94a3b8; }
 
+/* 1.10 Game switcher (the chips under the title, the join banner, the small game icon on rows) */
+.game-bar { display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
+.game-chip { flex:0 0 auto; padding:9px 14px; border-radius:20px; border:2px solid #334155; background:#1e293b; color:#94a3b8; font-weight:700; font-size:14px; cursor:pointer; }
+.game-chip.active { border-color:#38bdf8; color:#38bdf8; background:#0f172a; }
+.game-new { background:#f59e0b; color:#0f172a; border-radius:10px; padding:1px 6px; font-size:10px; font-weight:800; margin-left:4px; }
+.game-tag { font-size:13px; margin-right:4px; }
+.join-banner { background:#1e293b; border:1px solid #38bdf8; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:13px; color:#94a3b8; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.game-checks label { display:flex; align-items:center; gap:8px; font-size:14px; margin-bottom:6px; color:#f1f5f9; }
+.game-checks input { width:auto; margin:0; }
+
 /* 1.8 History Navigation */
 .history-nav { display:flex; justify-content:space-between; align-items:center; background:#1e293b; border-radius:10px; padding:10px 16px; margin-bottom:16px; }
 .history-nav button { background:#334155; color:#f1f5f9; border:none; border-radius:6px; padding:6px 14px; font-weight:700; cursor:pointer; font-size:14px; }
@@ -181,7 +192,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   <div id="main-app">
 
     <!-- APP HEADER -->
-    <h1>🎱 Game Stats</h1>
+    <h1>🎯 Game Stats</h1>
     <p class="subtitle">Track wins & losses with your colleagues</p>
     <div id="sync-status" class="sync-indicator">
       <div class="sync-dot syncing" id="sync-dot"></div>
@@ -200,6 +211,9 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 
     <div id="message" class="message info" style="display:none"></div>
 
+    <!-- GAME SWITCHER (shown only when there is more than one active game) -->
+    <div id="game-bar" class="game-bar" style="display:none"></div>
+
     <!-- NAVIGATION -->
     <div class="nav">
       <button class="active" onclick="switchTab('dashboard', this)">📊 Stats</button>
@@ -213,19 +227,16 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       SECTION 2 — TAB: STATS
     ============================================================ -->
     <div id="tab-dashboard" class="tab active">
+      <div id="join-banner" class="join-banner" style="display:none"></div>
       <div class="lang-filter" id="lang-filter"></div>
       <div class="elo-info-box">
         <div class="elo-info-header" onclick="toggleEloInfo()">
           <span>ℹ️ How is the ranking calculated?</span>
           <span id="elo-info-arrow">▼</span>
         </div>
-        <div class="elo-info-body" id="elo-info-body">
-          The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at 1000. Beating a higher-rated player earns you more points than beating a lower-rated one.
-          <br><br>
-          <strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). New ELO = current ELO + 32 × (result - expected score).
-        </div>
+        <div class="elo-info-body" id="elo-info-body"></div>
       </div>
-      <div class="section-title">🏆 Leaderboard</div>
+      <div class="section-title" id="leaderboard-title">🏆 Leaderboard</div>
       <div id="leaderboard"><div class="loading">Loading data...</div></div>
       <div id="general-stats" class="gen-stats"></div>
     </div>
@@ -254,8 +265,12 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <div class="empty">Please login to log a match</div>
         <button class="btn" onclick="showPlayerLogin()">Login</button>
       </div>
+      <div id="log-not-member" style="display:none">
+        <div class="empty" id="log-not-member-text"></div>
+        <button class="btn" id="log-join-btn">Join</button>
+      </div>
       <div id="log-form" style="display:none">
-        <div class="section-title">Log a Match</div>
+        <div class="section-title" id="log-title">Log a Match</div>
         <div style="background:#0f172a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#94a3b8;">
           Logging as: <span id="log-as-name" style="color:#38bdf8;font-weight:700;"></span>
         </div>
@@ -317,6 +332,26 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
         <div class="section-title">🔑 Password reset requests</div>
         <div id="reset-requests" style="margin-bottom:16px"></div>
 
+        <!-- Games -->
+        <div class="section-title">🎮 Games</div>
+        <div id="game-list"></div>
+        <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div class="section-title" style="font-size:14px;margin-bottom:10px">Add Game</div>
+          <label>Name</label>
+          <input id="newGameName" placeholder="e.g. Table tennis" maxlength="40" style="margin-bottom:10px">
+          <label>Icon (one emoji)</label>
+          <input id="newGameEmoji" placeholder="e.g. 🏓" maxlength="8" style="margin-bottom:10px">
+          <label>Short description (optional)</label>
+          <input id="newGameDesc" placeholder="e.g. Singles, first to 11" maxlength="200" style="margin-bottom:10px">
+          <label>ELO K-factor (how fast ratings move)</label>
+          <input type="number" id="newGameK" value="32" min="1" max="200" style="margin-bottom:10px">
+          <label>Starting ELO</label>
+          <input type="number" id="newGameBase" value="1000" min="0" max="5000" style="margin-bottom:10px">
+          <button class="btn" onclick="addGame()">Add Game</button>
+        </div>
+
+        <hr class="divider">
+
         <!-- Add Player -->
         <div class="section-title">Add Player</div>
         <div style="background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -326,6 +361,8 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
           <select id="newPlayerLang" style="margin-bottom:10px">
             <option value="">No category</option>
           </select>
+          <label>Plays in</label>
+          <div id="newPlayerGames" class="game-checks" style="margin-bottom:10px"></div>
           <label>Initial password</label>
           <input type="password" id="newPlayerPassword" placeholder="Set initial password..." style="margin-bottom:10px">
           <button class="btn" onclick="addPlayer()">Add Player</button>
@@ -333,6 +370,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
 
         <!-- Players list -->
         <div class="section-title">Players</div>
+        <div style="color:#64748b;font-size:12px;margin:-8px 0 10px">ELO and match counts are for the game selected at the top.</div>
         <div id="player-list"></div>
 
         <hr class="divider">
@@ -411,6 +449,8 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       7.4 Admin disputed
       7.5 Edit category
       7.6 Forgot password
+      7.7 New game pop-up
+      7.8 Edit game
     ============================================================ -->
 
     <!-- 7.1 Admin Login -->
@@ -471,6 +511,37 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
       </div>
     </div>
 
+    <!-- 7.7 New game pop-up (a player sees it once per game they have not joined) -->
+    <div id="newgame-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3 id="newgame-title">🆕 New game</h3>
+        <p id="newgame-text"></p>
+        <button class="btn" id="newgame-join-btn">Join</button>
+        <button class="btn-outline" onclick="declineNewGame()">No thanks</button>
+      </div>
+    </div>
+
+    <!-- 7.8 Edit Game Modal -->
+    <div id="edit-game-overlay" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <h3>✏️ Edit Game</h3>
+        <input type="hidden" id="edit-game-id">
+        <label>Name</label>
+        <input id="edit-game-name" maxlength="40" style="margin-bottom:10px">
+        <label>Icon (one emoji)</label>
+        <input id="edit-game-emoji" maxlength="8" style="margin-bottom:10px">
+        <label>Short description</label>
+        <input id="edit-game-desc" maxlength="200" style="margin-bottom:10px">
+        <label>ELO K-factor</label>
+        <input type="number" id="edit-game-k" min="1" max="200" style="margin-bottom:10px">
+        <label>Starting ELO</label>
+        <input type="number" id="edit-game-base" min="0" max="5000" style="margin-bottom:10px">
+        <p>Changing the ELO numbers recalculates every rating in this game, past matches included.</p>
+        <button class="btn" onclick="saveEditGame()">Save</button>
+        <button class="btn-danger" onclick="closeEditGameModal()">Cancel</button>
+      </div>
+    </div>
+
     <!-- 7.5 Edit Category Modal -->
     <div id="edit-cat-overlay" class="modal-overlay" style="display:none">
       <div class="modal">
@@ -528,6 +599,7 @@ label { color: #94a3b8; font-size: 13px; display: block; margin-bottom: 6px; }
   9.16 Window exports
   9.17 Secure accounts (Firebase Auth login, reset, recovery email)
   9.18 Match record helpers (used by Import and Reset)
+  9.19 Games (switcher, join pop-up, last game, admin tools)
 ============================================================ -->
 <script type="module">
 
@@ -584,6 +656,8 @@ const settingsRef    = doc(db, 'gamestats', 'settings');
 const categoriesRef  = doc(db, 'gamestats', 'categories');  // NEW — stores categories
 const matchesCol     = collection(db, 'matches');              // one document per match
 const loginsCol      = collection(db, 'logins');               // logins/<pid> = { av }
+const gamesCol       = collection(db, 'games');               // games/<id> = one document per game (pool, table tennis, ...)
+const playerGamesCol = collection(db, 'playerGames');         // playerGames/<pid> = { joined, lastGame, declined }
 
 logEvent(analytics, 'app_open');
 
@@ -602,8 +676,18 @@ const DEFAULT_CATEGORIES = [
   { code: 'mgr', label: 'Managers',   type: 'emoji', value: '👔'  },
 ];
 
-const ELO_K    = 32;
-const ELO_BASE = 1000;
+// ELO numbers of the game on screen. They are re-read from the game's own rules (see applyRules)
+// every time the page is drawn, so each game can use its own K-factor and starting rating.
+let ELO_K    = 32;
+let ELO_BASE = 1000;
+
+// 2.1 Games. 'pool' is the built-in first game: every match logged before games existed has no
+//     gameId and counts as pool, and every player starts as a pool player, so nothing was migrated.
+const POOL_ID = 'pool';
+const DEFAULT_GAMES = [
+  { id: POOL_ID, name: 'Pool', emoji: '🎱', description: 'The office classic', status: 'active', order: 1,
+    rules: { eloK: 32, eloBase: 1000, scoring: 'win-loss', format: 'singles' } }
+];
 
 // App state
 let data            = { players: [], matches: [] };
@@ -624,6 +708,14 @@ let isAdmin         = false;
 let matchResult     = 'won';
 let eloInfoOpen     = false;
 let historyDayOffset= 0;
+let games           = [...DEFAULT_GAMES];  // games/<id> documents (pool is always in the list)
+let memberships     = {};     // pid -> { joined: [gameIds], lastGame, declined: [gameIds] }
+let currentGameId   = null;   // the game on screen
+let userPicked      = false;  // true once the visitor tapped a game chip (stops auto-choosing)
+let gamesLoaded     = false, membershipsLoaded = false;   // the pop-up waits for both
+let poolInDb        = false;  // is there a games/pool document yet? (the admin creates it)
+const gamePrompted  = new Set();  // new-game pop-ups already shown during this page load
+let newGamePromptId = null;
 let matchDocs       = [];     // matches as stored in matches/<id> (raw, before names are filled in)
 let loginAvs        = {};     // pid -> login version, from logins/<pid>
 const autoTried     = new Set(); // matches this browser already tried to auto-confirm
@@ -690,6 +782,29 @@ onSnapshot(loginsCol, (snap) => {
   snap.forEach(d => { loginAvs[d.id] = d.data().av; });
 }, () => {});
 
+// Games listener (9.19). The list always contains pool, even before games/pool exists.
+onSnapshot(gamesCol, (snap) => {
+  const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  poolInDb = list.some(g => g.id === POOL_ID);
+  if (!poolInDb) list.push(DEFAULT_GAMES[0]);
+  games = list.sort((a, b) => (a.order || 0) - (b.order || 0) || (String(a.name) < String(b.name) ? -1 : 1));
+  gamesLoaded = true;
+  seedPool();
+  chooseStartGame();
+  maybePromptNewGame();
+  render();
+}, () => {});
+
+// Player memberships listener: which games each player joined and opened last
+onSnapshot(playerGamesCol, (snap) => {
+  memberships = {};
+  snap.forEach(d => { memberships[d.id] = d.data(); });
+  membershipsLoaded = true;
+  chooseStartGame();
+  maybePromptNewGame();
+  render();
+}, () => {});
+
 // Builds data.matches (oldest first, the order ELO is calculated in) from the match documents.
 // Names are looked up from the player id, so a renamed player keeps all their matches
 // and nobody can fake a name inside a match.
@@ -699,6 +814,7 @@ function rebuildMatches() {
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1))
     .map(m => ({
       ...m,
+      gameId:   m.gameId || POOL_ID,                  // no gameId = a pool match from before games existed
       winner:   nameOf(m.winnerPid) || m.winner,
       loser:    nameOf(m.loserPid)  || m.loser,
       loggedBy: m.loggedByPid === 'admin' ? 'admin' : (nameOf(m.loggedByPid) || m.loggedBy)
@@ -800,9 +916,12 @@ function getPlayerBadge(name) {
   return getCategoryBadge(p.lang);
 }
 
+// Matches of the game on screen (every stat below is per game)
+function gameMatches() { return data.matches.filter(m => m.gameId === currentGameId); }
+
 // Only count confirmed and provisional matches in stats
 function getConfirmed() {
-  return data.matches.filter(m => m.status === 'confirmed' || m.status === 'provisional' || !m.status);
+  return gameMatches().filter(m => m.status === 'confirmed' || m.status === 'provisional' || !m.status);
 }
 
 // Calculate ELO for all players
@@ -825,7 +944,7 @@ function calculateEloChanges() {
   const ratings = {};
   data.players.forEach(p => { ratings[p.name] = ELO_BASE; });
   const changes = [];
-  data.matches.forEach(m => {
+  gameMatches().forEach(m => {
     if (m.status === 'pending' || m.status === 'disputed') { changes.push(null); return; }
     const rW = ratings[m.winner] || ELO_BASE;
     const rL = ratings[m.loser]  || ELO_BASE;
@@ -867,6 +986,14 @@ function getH2H(p1, p2) {
 // Only matches that live in their own record (they have an id) can be confirmed or disputed
 function getPendingForPlayer(name) {
   return data.matches.filter(m => m.id && m.status === 'provisional' && m.loser === name);
+}
+
+// Small game icon in front of a match, only when there is more than one game (pending and disputed
+// lists show matches from every game, so the icon says which one)
+function gameTag(m) {
+  if (activeGames().length < 2) return '';
+  const g = getGame(m.gameId);
+  return g ? `<span class="game-tag" title="${esc(g.name)}">${esc(g.emoji)}</span>` : '';
 }
 
 // 9.4.1 Safe output. Everything a user can type (names, category labels, ids from the database)
@@ -1055,6 +1182,7 @@ async function attemptAdminLogin() {
     const ok = await getDoc(doc(db, 'admins', cred.user.uid));
     if (!ok.exists()) { await signOut(auth); showMessage('Wrong username or password!', 'error'); return; }
     isAdmin = true;
+    seedPool();
     hideAdminLogin();
     showMessage('Welcome admin! 👋', 'success');
     logEvent(analytics, 'admin_login');
@@ -1081,7 +1209,7 @@ function showAdminDisputedModal() {
   document.getElementById('admin-disputed-list').innerHTML = disputed.map(m => `
     <div class="approval-match-row">
       <div class="approval-match-text">
-        <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+        ${gameTag(m)}<span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
         <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
         <span style="color:#475569;font-size:12px;margin-left:6px">${fmtDate(m.date)}</span>
         <div style="color:#ef4444;font-size:11px;margin-top:4px">⚠️ Disputed by ${esc(m.disputedBy || m.loser)}</div>
@@ -1136,12 +1264,14 @@ async function attemptPlayerLogin() {
     logEvent(analytics, 'player_login', { player_name: name });
     autoApprovePreviousDays();
     refreshMyEmail();
+    userPicked = false; chooseStartGame();         // open the game this player used last
     const pending = getPendingForPlayer(name);
     if (pending.length > 0) {
       showApprovalModal(name);
     } else {
       showMessage('Welcome ' + name + '! 👋', 'success');
     }
+    maybePromptNewGame();                          // waits by itself while the approval window is open
     render();
   } catch(e) {
     showMessage('Wrong password!', 'error');
@@ -1164,7 +1294,7 @@ function showApprovalModal(playerName) {
   document.getElementById('approval-list').innerHTML = pending.map(m => `
     <div class="approval-match-row" id="approval-row-${esc(m.id)}">
       <div class="approval-match-text">
-        <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> says they beat you on <strong>${fmtDate(m.date)}</strong>
+        ${gameTag(m)}<span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> says they beat you on <strong>${fmtDate(m.date)}</strong>
       </div>
       <div class="approval-match-actions">
         <button class="btn-act btn-act-confirm" onclick="approvalConfirm(${jsArg(m.id)})">✅ Confirm</button>
@@ -1197,6 +1327,7 @@ async function approvalDispute(id) {
 function closeApprovalModal() {
   document.getElementById('approval-overlay').style.display = 'none';
   showMessage('Welcome ' + currentPlayer + '! 👋', 'success');
+  maybePromptNewGame();
 }
 function scrollToPending() {
   const historyBtn = document.querySelectorAll('.nav button')[3];
@@ -1230,9 +1361,11 @@ async function logMatch() {
     }
   }
 
+  const game = curGame();
+  if (!game || game.status === 'archived') { showMessage('This game is archived. Pick another one.', 'error'); return; }
   const todayKeys  = dateKeys(new Date());
   const today      = todayKeys[0];                       // stored as YYYY-MM-DD
-  const duplicates = data.matches.filter(m =>
+  const duplicates = gameMatches().filter(m =>
     m.status === 'provisional' &&
     ((m.winner === winner && m.loser === loser) || (m.winner === loser && m.loser === winner)) &&
     todayKeys.includes(m.date)
@@ -1245,6 +1378,7 @@ async function logMatch() {
   // One new document per match. createdAt keeps the ELO order, pendingSince starts the 24h dispute window;
   // both use the server's clock (the database rules check this).
   const ok = await sync(() => addDoc(matchesCol, {
+    gameId: game.id,
     winner, loser, winnerPid: w.pid, loserPid: l.pid,
     date: today,
     loggedBy:    currentPlayer || 'admin',
@@ -1254,7 +1388,8 @@ async function logMatch() {
     pendingSince: serverTimestamp()
   }));
   if (!ok) return;
-  logEvent(analytics, 'match_logged', { status, logged_by: currentPlayer || 'admin' });
+  logEvent(analytics, 'match_logged', { status, logged_by: currentPlayer || 'admin', game: game.id });
+  rememberLastGame();                              // playing a game also makes it the one opened next time
 
   ['opponent','winner','loser'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
@@ -1385,12 +1520,15 @@ async function addPlayer() {
   if (data.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
     showMessage('Player already exists!', 'error'); return;
   }
+  const picked = checkedGames('newPlayerGames');
+  if (picked.length === 0) { showMessage('Pick at least one game for this player!', 'error'); return; }
   const player = { name, lang, pid: newId(), av: 0 };
   try {
     await createLogin(player, password);          // 1. secure login first
   } catch(e) { showMessage('Could not create login: ' + e.code, 'error'); return; }
   data.players.push(player);
   await savePlayers();                             // 2. then the player record
+  await sync(() => setDoc(doc(db, 'playerGames', player.pid), { joined: picked, lastGame: picked[0], declined: [] }));   // 3. the games they play
   document.getElementById('newPlayer').value         = '';
   document.getElementById('newPlayerLang').value     = '';
   document.getElementById('newPlayerPassword').value = '';
@@ -1411,6 +1549,7 @@ async function deletePlayer(name) {
       await deleteDoc(doc(db, 'playerEmails', p.pid));
       await deleteDoc(doc(db, 'resets',       p.pid));
       await deleteDoc(doc(db, 'logins',       p.pid));   // nobody can log new matches against them
+      await deleteDoc(doc(db, 'playerGames',  p.pid));
     } catch(e) {}
   }
 }
@@ -1447,6 +1586,14 @@ async function saveEditPlayer(oldName) {
   // only touch the email if its box was loaded (never wipe it by accident)
   if (player.pid && editEmailDraft[oldName] !== undefined) await writeEmail(player.pid, editEmailDraft[oldName].trim());
   delete editEmailDraft[oldName];
+  // Games: the ticked boxes become the player's list (the matches they already played stay either way)
+  if (player.pid && document.getElementById('edit-games-' + oldName)) {
+    const joined = checkedGames('edit-games-' + oldName);
+    const rec    = memberships[player.pid] || {};
+    await sync(() => setDoc(doc(db, 'playerGames', player.pid), {
+      joined, lastGame: joined.includes(rec.lastGame) ? rec.lastGame : (joined[0] || POOL_ID), declined: rec.declined || []
+    }));
+  }
   // Matches find the new name through the player id, so they need no change
   data.players = data.players.map(p => p.name === oldName ? { ...p, name: newName, lang: newLang } : p);
   await savePlayers();
@@ -1481,7 +1628,7 @@ function historyNextDay() { if (historyDayOffset < 0) { historyDayOffset++; rend
 ---------------------------------------------------------- */
 function exportData() {
   // matches include ids, player ids and times (milliseconds) so an import keeps the order
-  const json = JSON.stringify(data, null, 2);
+  const json = JSON.stringify({ ...data, games, playerGames: memberships }, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -1510,6 +1657,7 @@ async function importData(event) {
       await writeMatchDocs(docs);                                 // 2. write the imported ones
       await setDoc(dataRef, { players });                         // 3. player list (also drops any old list)
       await writeLoginDocs(players);                              // 4. make every player a valid opponent
+      await writeGameDocs(imported.games, imported.playerGames);  // 5. games and memberships (older files have none)
       setSyncStatus('live');
       logEvent(analytics, 'data_imported');
       showMessage('Imported! ' + players.length + ' players, ' + docs.length + ' matches.', 'success');
@@ -1524,6 +1672,7 @@ async function resetData() {
   if (!confirm('Are you absolutely sure?')) return;
   await sync(async () => {
     await deleteAllMatches();
+    await deleteAllMemberships();
     await setDoc(dataRef, { players: [] });
   });
   showMessage('All data reset.', 'info');
@@ -1576,6 +1725,12 @@ function setLangFilter(lang) {
 function render() {
   // Who is logged in comes from Firebase Auth (see 9.17); the name is looked up from the player id
   if (currentPid) { const me = data.players.find(p => p.pid === currentPid); currentPlayer = me ? me.name : null; }
+
+  if (!currentGameId) chooseStartGame();
+  applyRules();                                   // ELO numbers of the game on screen
+  const game = curGame();
+  const gp   = gamePlayers();                     // players of this game: the leaderboard, odds and log lists use these
+  renderGameBar(game);
 
   const eloRatings = calculateAllElos();
   const maxElo     = Math.max(...Object.values(eloRatings), ELO_BASE);
@@ -1637,6 +1792,10 @@ function render() {
       categories.map(c => `<option value="${esc(c.code)}">${c.type === 'emoji' ? esc(c.value) : '🏳️'} ${esc(c.label)}</option>`).join('');
   }
 
+  /* --- Admin: games ticked in the Add Player form, and the game list --- */
+  renderNewPlayerGames();
+  renderGameList();
+
   /* --- Category list in admin panel --- */
   const catList = document.getElementById('category-list');
   if (catList) {
@@ -1666,22 +1825,34 @@ function render() {
 
   /* --- Log tab --- */
   const logNotLogged  = document.getElementById('log-not-logged');
+  const logNotMember  = document.getElementById('log-not-member');
   const logForm       = document.getElementById('log-form');
   const logPlayerForm = document.getElementById('log-player-form');
   const logAdminForm  = document.getElementById('log-admin-form');
+  const notMember = !!currentPlayer && !isAdmin && !isMember(currentPid, game.id);
+  logNotMember.style.display = notMember ? 'block' : 'none';
+  document.getElementById('log-title').textContent = 'Log a ' + game.name + ' match';
+  if (notMember) {
+    document.getElementById('log-not-member-text').textContent = 'You have not joined ' + game.name + ' yet.';
+    const jb = document.getElementById('log-join-btn');
+    jb.textContent = 'Join ' + game.name;
+    jb.onclick = () => joinGame(game.id);
+  }
   if (!currentPlayer && !isAdmin) {
     logNotLogged.style.display = 'block'; logForm.style.display = 'none';
+  } else if (notMember) {
+    logNotLogged.style.display = 'none'; logForm.style.display = 'none';
   } else {
     logNotLogged.style.display = 'none'; logForm.style.display = 'block';
     document.getElementById('log-as-name').textContent = isAdmin ? 'Admin (can log any match)' : currentPlayer;
     if (isAdmin) {
       logPlayerForm.style.display = 'none'; logAdminForm.style.display = 'block';
-      const opts = data.players.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+      const opts = gp.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
       document.getElementById('winner').innerHTML = '<option value="">Select winner...</option>' + opts;
       document.getElementById('loser').innerHTML  = '<option value="">Select loser...</option>'  + opts;
     } else {
       logPlayerForm.style.display = 'block'; logAdminForm.style.display = 'none';
-      const opts = data.players.filter(p => p.name !== currentPlayer)
+      const opts = gp.filter(p => p.name !== currentPlayer)
         .map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
       document.getElementById('opponent').innerHTML = '<option value="">Select opponent...</option>' + opts;
     }
@@ -1691,12 +1862,12 @@ function render() {
   const oddsSelect           = document.getElementById('odds-player-select');
   const currentOddsSelection = oddsSelect.value;
   oddsSelect.innerHTML = '<option value="">Select player...</option>' +
-    [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE))
+    [...gp].sort((a,b) => (eloRatings[b.name]||ELO_BASE) - (eloRatings[a.name]||ELO_BASE))
       .map(p => `<option value="${esc(p.name)}" ${p.name === currentOddsSelection ? 'selected' : ''}>${esc(p.name)} (ELO ${eloRatings[p.name]||ELO_BASE})</option>`).join('');
   if (!oddsSelect.value) {
     if (currentPlayer) oddsSelect.value = currentPlayer;
-    else if (data.players.length > 0)
-      oddsSelect.value = [...data.players].sort((a,b) => (eloRatings[b.name]||ELO_BASE)-(eloRatings[a.name]||ELO_BASE))[0].name;
+    else if (gp.length > 0)
+      oddsSelect.value = [...gp].sort((a,b) => (eloRatings[b.name]||ELO_BASE)-(eloRatings[a.name]||ELO_BASE))[0].name;
   }
   const selectedOddsPlayer = oddsSelect.value;
   const oddsList            = document.getElementById('odds-list');
@@ -1706,7 +1877,7 @@ function render() {
     oddsPlayerInfo.style.display = 'flex';
     document.getElementById('odds-player-name').innerHTML  = `${getPlayerBadge(selectedOddsPlayer)}${esc(selectedOddsPlayer)}`;
     document.getElementById('odds-player-elo').textContent = `ELO ${playerElo}`;
-    const opponents = data.players.filter(p => p.name !== selectedOddsPlayer)
+    const opponents = gp.filter(p => p.name !== selectedOddsPlayer)
       .map(p => {
         const oppElo = eloRatings[p.name] || ELO_BASE;
         const odds   = getEloOdds(playerElo, oppElo);
@@ -1744,7 +1915,7 @@ function render() {
 
   /* --- Category filter — only show categories with at least one player --- */
   const lf        = document.getElementById('lang-filter');
-  const usedCodes = new Set(data.players.map(p => p.lang).filter(Boolean));
+  const usedCodes = new Set(gp.map(p => p.lang).filter(Boolean));
   const allBtn    = `<button class="lang-btn ${activeLang === 'all' ? 'active' : ''}" onclick="setLangFilter('all')">🌍 All</button>`;
   const catBtns   = categories.filter(c => usedCodes.has(c.code)).map(c =>
     `<button class="lang-btn ${activeLang === c.code ? 'active' : ''}" onclick="setLangFilter(${jsArg(c.code)})">
@@ -1754,7 +1925,7 @@ function render() {
   lf.innerHTML = allBtn + catBtns;
 
   /* --- Leaderboard --- */
-  const filteredPlayers = activeLang === 'all' ? data.players : data.players.filter(p => p.lang === activeLang);
+  const filteredPlayers = activeLang === 'all' ? gp : gp.filter(p => p.lang === activeLang);
   const minM     = settings.minMatches || 0;
   const ranked   = filteredPlayers.filter(p => getStats(p.name).total >= minM);
   const unranked = filteredPlayers.filter(p => getStats(p.name).total <  minM);
@@ -1762,7 +1933,7 @@ function render() {
 
   const lb = document.getElementById('leaderboard');
   if (filteredPlayers.length === 0) {
-    lb.innerHTML = '<div class="empty">No players found.</div>';
+    lb.innerHTML = '<div class="empty">No players in ' + esc(game.name) + ' yet.</div>';
   } else {
     const medals     = ['🥇','🥈','🥉'];
     const rankedHTML = ranked.map((p, i) => {
@@ -1778,7 +1949,7 @@ function render() {
           <div><span class="loss">${s.losses}</span><span>Losses</span></div>
           <div><span style="color:#38bdf8;font-weight:800">${s.pct}%</span><span>Win rate</span></div>
         </div>`;
-        const opponents = data.players.filter(op => op.name !== p.name)
+        const opponents = gp.filter(op => op.name !== p.name)
           .map(op => ({ name: op.name, ...getH2H(p.name, op.name) }))
           .filter(op => op.total > 0).sort((a,b) => b.total - a.total);
         const opponentsHTML = opponents.length === 0
@@ -1843,7 +2014,7 @@ function render() {
   const confirmedMatches = getConfirmed();
   const teamEloHTML = (() => {
     const teams = categories.map(c => {
-      const cPlayers     = data.players.filter(p => p.lang === c.code);
+      const cPlayers     = gp.filter(p => p.lang === c.code);
       if (cPlayers.length === 0) return null;
       const avgElo       = Math.round(cPlayers.reduce((s,p) => s+(eloRatings[p.name]||ELO_BASE),0)/cPlayers.length);
       const cNames       = cPlayers.map(p => p.name);
@@ -1883,14 +2054,14 @@ function render() {
   if (confirmedMatches.length===0 && !teamEloHTML) {
     gs.innerHTML = '';
   } else {
-    const mostActive = [...data.players].sort((a,b)=>getStats(b.name).total-getStats(a.name).total)[0];
+    const mostActive = [...gp].sort((a,b)=>getStats(b.name).total-getStats(a.name).total)[0];
     let biggestRivalry=null, maxRival=0;
-    for (let i=0;i<data.players.length;i++) for (let j=i+1;j<data.players.length;j++) {
-      const h=getH2H(data.players[i].name,data.players[j].name);
-      if (h.total>maxRival){maxRival=h.total;biggestRivalry={p1:data.players[i].name,p2:data.players[j].name,...h};}
+    for (let i=0;i<gp.length;i++) for (let j=i+1;j<gp.length;j++) {
+      const h=getH2H(gp[i].name,gp[j].name);
+      if (h.total>maxRival){maxRival=h.total;biggestRivalry={p1:gp[i].name,p2:gp[j].name,...h};}
     }
     let bestStreakPlayer='', bestStreak=0;
-    data.players.forEach(p=>{
+    gp.forEach(p=>{
       let best=0,cur=0;
       getConfirmed().forEach(m=>{if(m.winner===p.name){cur++;best=Math.max(best,cur);}else if(m.loser===p.name){cur=0;}});
       if(best>bestStreak){bestStreak=best;bestStreakPlayer=p.name;}
@@ -1900,7 +2071,7 @@ function render() {
       <div class="gen-stats-title">🔢 General Stats</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div class="gen-stat-card"><div class="label">Total matches</div><div class="value">${confirmedMatches.length}</div></div>
-        <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${data.players.length}</div></div>
+        <div class="gen-stat-card"><div class="label">Total players</div><div class="value">${gp.length}</div></div>
       </div>
       ${mostActive?`<div class="gen-stat-card"><div class="label">Most active player</div><div class="value">${getPlayerBadge(mostActive.name)}${esc(mostActive.name)}</div><div class="sub">${getStats(mostActive.name).total} matches · ELO ${eloRatings[mostActive.name]||ELO_BASE}</div></div>`:''}
       ${biggestRivalry?`<div class="gen-stat-card" style="cursor:pointer" onclick="openH2H(${jsArg(biggestRivalry.p1)},${jsArg(biggestRivalry.p2)})"><div class="label">Biggest rivalry ↗</div><div class="value">${getPlayerBadge(biggestRivalry.p1)}${esc(biggestRivalry.p1)} vs ${getPlayerBadge(biggestRivalry.p2)}${esc(biggestRivalry.p2)}</div><div class="sub">${biggestRivalry.total} matches together</div></div>`:''}
@@ -1922,7 +2093,7 @@ function render() {
       pendingList.innerHTML = pending.map(m => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
           <span>
-            <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+            ${gameTag(m)}<span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
             <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
             <span style="color:#475569;font-size:12px;margin-left:4px">${fmtDate(m.date)}</span>
           </span>
@@ -1941,7 +2112,7 @@ function render() {
       disputedList.innerHTML = disputed.map(m => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #334155;font-size:14px;">
           <span>
-            <span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
+            ${gameTag(m)}<span class="win">${getPlayerBadge(m.winner)}${esc(m.winner)}</span> beat
             <span class="loss">${getPlayerBadge(m.loser)}${esc(m.loser)}</span>
             <span style="color:#475569;font-size:12px;margin-left:4px">${fmtDate(m.date)}</span>
             <br><span style="color:#ef4444;font-size:11px">⚠️ Disputed by ${esc(m.disputedBy||m.loser)}</span>
@@ -1962,10 +2133,10 @@ function render() {
 
   const eloChanges = calculateEloChanges();
   const hl         = document.getElementById('history-list');
-  const dayMatches = data.matches.map((m,i)=>({...m,origIdx:i})).filter(m=>targetKeys.includes(m.date)).reverse();
+  const dayMatches = gameMatches().map((m,i)=>({...m,origIdx:i})).filter(m=>targetKeys.includes(m.date)).reverse();
 
   if (dayMatches.length === 0) {
-    hl.innerHTML = '<div class="empty">No matches on this day.</div>';
+    hl.innerHTML = '<div class="empty">No ' + esc(game.name) + ' matches on this day.</div>';
   } else {
     hl.innerHTML = dayMatches.map(m => {
       const i             = m.origIdx;                       // position, for the ELO change
@@ -1988,10 +2159,10 @@ function render() {
       if (isEditing && canEdit) {
         editSection = `<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid #334155;padding-top:10px;">
           <select id="edit-winner-${esc(id)}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p=>`<option value="${esc(p.name)}" ${p.name===m.winner?'selected':''}>${esc(p.name)}</option>`).join('')}
+            ${gp.map(p=>`<option value="${esc(p.name)}" ${p.name===m.winner?'selected':''}>${esc(p.name)}</option>`).join('')}
           </select>
           <select id="edit-loser-${esc(id)}" style="margin-bottom:0;flex:1;padding:8px;font-size:13px;">
-            ${data.players.map(p=>`<option value="${esc(p.name)}" ${p.name===m.loser?'selected':''}>${esc(p.name)}</option>`).join('')}
+            ${gp.map(p=>`<option value="${esc(p.name)}" ${p.name===m.loser?'selected':''}>${esc(p.name)}</option>`).join('')}
           </select>
           <button class="btn-act btn-act-confirm" onclick="saveEditMatch(${jsArg(id)})">Save</button>
         </div>`;
@@ -2039,6 +2210,7 @@ function render() {
             <button class="btn-act btn-act-confirm" onclick="saveEditPlayer(${jsArg(p.name)})">Save</button>
           </div>
           <select id="edit-lang-${esc(p.name)}" style="margin-bottom:0">${catOptions}</select>
+          <div id="edit-games-${esc(p.name)}" class="game-checks">${gameChecksHTML(joinedIds(p.pid))}</div>
           <input type="password" id="edit-pass-${esc(p.name)}" placeholder="New password (leave blank to keep)" style="margin-bottom:0">
           <input type="email" id="edit-email-${esc(p.name)}" value="${esc(editEmailDraft[p.name] || '')}" oninput="editEmailDraft[${jsArg(p.name)}] = this.value" placeholder="Recovery email (optional, private)" style="margin-bottom:0">
         </div>`;
@@ -2099,6 +2271,8 @@ onAuthStateChanged(auth, async (user) => {
     }
   } catch(e) {}
   autoApprovePreviousDays();
+  userPicked = false; chooseStartGame();           // a restored login also opens the player's last game
+  maybePromptNewGame();
   render();
 });
 
@@ -2343,6 +2517,7 @@ function toMatchDocs(list, players) {
       loser:        m.loser,
       winnerPid:    known(m.winnerPid) ? m.winnerPid : byName(m.winner),
       loserPid:     known(m.loserPid)  ? m.loserPid  : byName(m.loser),
+      gameId:       m.gameId || POOL_ID,
       date:         m.date || '',
       loggedBy:     m.loggedBy || 'admin',
       loggedByPid:  loggedByPid || null,
@@ -2364,6 +2539,25 @@ async function writeMatchDocs(docs) {
     await batch.commit();
   }
 }
+async function deleteAllMemberships() {
+  const snap = await getDocs(playerGamesCol);
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+// Import: write games and memberships when the file has them (files from before games have neither)
+async function writeGameDocs(gameList, memberList) {
+  for (const g of (Array.isArray(gameList) ? gameList : [])) {
+    if (g && /^[a-z0-9-]{2,30}$/.test(g.id || '')) await setDoc(doc(db, 'games', g.id), gameDoc(g));
+  }
+  for (const [pid, r] of Object.entries(memberList || {})) {
+    if (r && Array.isArray(r.joined)) await setDoc(doc(db, 'playerGames', pid), {
+      joined: r.joined, lastGame: r.lastGame || POOL_ID, declined: Array.isArray(r.declined) ? r.declined : []
+    });
+  }
+}
 async function deleteAllMatches() {
   const snap = await getDocs(matchesCol);
   for (let i = 0; i < snap.docs.length; i += 400) {
@@ -2378,6 +2572,266 @@ async function writeLoginDocs(players) {
   const batch = writeBatch(db);
   players.filter(p => p.pid).forEach(p => batch.set(doc(db, 'logins', p.pid), { av: loginAvs[p.pid] || p.av || 0 }));
   await batch.commit();
+}
+
+/* ----------------------------------------------------------
+  9.19 Games
+  One portal, several games. Every match belongs to one game
+  (matches/<id>.gameId; no gameId = pool). Ratings and stats are
+  worked out per game from that game's own matches, so a player
+  starts every new game at its starting ELO with no stored number
+  to reset. Name, flag and login are shared by all games.
+  9.19.1 Lookups
+  9.19.2 Which game opens (last game, device fallback)
+  9.19.3 Switcher, join, "new game" pop-up
+  9.19.4 Admin tools (add, edit, archive)
+---------------------------------------------------------- */
+
+/* 9.19.1 Lookups */
+function getGame(id)    { return games.find(g => g.id === id) || null; }
+function activeGames()  { return games.filter(g => g.status !== 'archived'); }
+function curGame()      { return getGame(currentGameId) || activeGames()[0] || games[0]; }
+// A player with no playerGames document is a pool player (how everybody started)
+function joinedIds(pid) { const r = memberships[pid]; return r && Array.isArray(r.joined) ? r.joined : [POOL_ID]; }
+function isMember(pid, gid) { return joinedIds(pid).includes(gid); }
+// Players shown in a game: those who joined it, plus anyone who has matches in it
+function gamePlayers(gid = currentGameId) {
+  const played = new Set();
+  data.matches.forEach(m => { if (m.gameId === gid) { played.add(m.winnerPid); played.add(m.loserPid); } });
+  return data.players.filter(p => isMember(p.pid, gid) || played.has(p.pid));
+}
+// ELO numbers come from the game's own rules record
+function applyRules() {
+  const r = (curGame() || {}).rules || {};
+  ELO_K    = Number(r.eloK) || 32;
+  ELO_BASE = Number(r.eloBase ?? 1000);
+}
+// Fields of a games/<id> document (the id is the document name, not a field)
+function gameDoc(g) {
+  const r = g.rules || {};
+  return {
+    name:        String(g.name).slice(0, 40),
+    emoji:       [...String(g.emoji || '🎮')].slice(0, 4).join(''),
+    description: String(g.description || '').slice(0, 200),
+    status:      g.status === 'archived' ? 'archived' : 'active',
+    order:       Number(g.order) || 0,
+    rules:       { eloK: Number(r.eloK) || 32, eloBase: Number(r.eloBase ?? 1000), scoring: 'win-loss', format: 'singles' },
+    createdAt:   g.createdAt || Date.now()
+  };
+}
+// The admin's browser creates games/pool the first time it sees there is none
+function seedPool() {
+  if (!isAdmin || !gamesLoaded || poolInDb) return;
+  poolInDb = true;
+  setDoc(doc(db, 'games', POOL_ID), gameDoc(DEFAULT_GAMES[0])).catch(() => { poolInDb = false; });
+}
+
+/* 9.19.2 Which game opens.
+   Order: the logged-in player's lastGame (kept in the database, so it follows them to any
+   device), then the game last used on this device (localStorage), then pool.
+   Once the visitor taps a game chip we stop choosing for them until they log in or out. */
+function savedDeviceGame()    { try { return localStorage.getItem('gsGame'); } catch(e) { return null; } }
+function rememberDeviceGame(id) { try { localStorage.setItem('gsGame', id); } catch(e) {} }
+function chooseStartGame() {
+  const usable = id => { const g = getGame(id); return !!g && g.status !== 'archived'; };
+  if (userPicked && usable(currentGameId)) return;
+  const mine = currentPid && memberships[currentPid] ? memberships[currentPid].lastGame : null;
+  const pick = [mine, savedDeviceGame(), POOL_ID].find(usable) || (activeGames()[0] || games[0]).id;
+  currentGameId = pick;
+}
+
+/* 9.19.3 Switcher, join, pop-up */
+function renderGameBar(game) {
+  const list = activeGames();
+  const bar  = document.getElementById('game-bar');
+  bar.style.display = list.length > 1 ? 'flex' : 'none';
+  bar.innerHTML = list.map(g => {
+    const notJoined = !!currentPid && !isAdmin && !isMember(currentPid, g.id);
+    return `<button class="game-chip ${g.id === game.id ? 'active' : ''}" onclick="switchGame(${jsArg(g.id)})">${esc(g.emoji)} ${esc(g.name)}${notJoined ? '<span class="game-new">JOIN</span>' : ''}</button>`;
+  }).join('');
+  document.getElementById('leaderboard-title').textContent = '🏆 ' + (list.length > 1 ? game.name + ' ' : '') + 'Leaderboard';
+  document.getElementById('elo-info-body').innerHTML =
+    `The leaderboard uses the <strong>ELO rating system</strong> — the same used in chess and football rankings. Everyone starts at ${esc(ELO_BASE)} in ${esc(game.name)}. Beating a higher-rated player earns you more points than beating a lower-rated one.
+     <br><br>
+     <strong>Formula:</strong> Expected score = 1 / (1 + 10^((opponent ELO - your ELO) / 400)). New ELO = current ELO + ${esc(ELO_K)} × (result - expected score).`;
+  const banner = document.getElementById('join-banner');
+  if (currentPid && !isAdmin && !isMember(currentPid, game.id)) {
+    banner.style.display = 'flex';
+    banner.innerHTML = `<span>You are not in ${esc(game.name)} yet. Joining starts you at ELO ${esc(ELO_BASE)}.</span>
+      <button class="btn-act btn-act-confirm" onclick="joinGame(${jsArg(game.id)})">Join</button>`;
+  } else banner.style.display = 'none';
+}
+
+// Writes the logged-in player's playerGames record (merging the change into what is there)
+async function saveMembership(patch, quiet) {
+  if (!currentPid) return true;
+  const cur  = memberships[currentPid] || {};
+  const next = { joined: cur.joined || [POOL_ID], lastGame: cur.lastGame || POOL_ID, declined: cur.declined || [], ...patch };
+  const write = () => setDoc(doc(db, 'playerGames', currentPid), next);
+  if (!quiet) return sync(write);
+  try { await write(); return true; } catch(e) { return false; }   // remembering the last game is never worth an error message
+}
+function rememberLastGame() {
+  if (currentPid && (memberships[currentPid] || {}).lastGame !== currentGameId) saveMembership({ lastGame: currentGameId }, true);
+}
+
+function switchGame(id) {
+  if (!getGame(id) || id === currentGameId) return;
+  userPicked = true; currentGameId = id;
+  rememberDeviceGame(id);
+  selectedPlayer = null; editingMatch = null; historyDayOffset = 0;
+  logEvent(analytics, 'game_switched', { game: id });
+  render();
+  rememberLastGame();
+}
+
+async function joinGame(id) {
+  const g = getGame(id);
+  if (!g) return;
+  if (!currentPid) { showPlayerLogin(); return; }
+  const joined = joinedIds(currentPid);
+  userPicked = true; currentGameId = id;
+  rememberDeviceGame(id);
+  render();
+  const ok = await saveMembership({ joined: joined.includes(id) ? joined : [...joined, id], lastGame: id });
+  if (ok) { logEvent(analytics, 'game_joined', { game: id }); showMessage('Welcome to ' + g.name + '! You start at ELO ' + Number(g.rules?.eloBase ?? 1000) + ' 🎉', 'success'); }
+}
+
+// The pop-up: a logged-in player who has not joined (and not declined) an active game sees it once.
+// It waits until the games and memberships have both loaded, and until the approval window is closed.
+function maybePromptNewGame() {
+  if (!currentPid || isAdmin || !gamesLoaded || !membershipsLoaded) return;
+  if (document.getElementById('approval-overlay').style.display === 'flex') return;
+  if (document.getElementById('newgame-overlay').style.display === 'flex') return;
+  const rec = memberships[currentPid] || {};
+  const g = activeGames().find(x => !isMember(currentPid, x.id) && !(rec.declined || []).includes(x.id) && !gamePrompted.has(x.id));
+  if (!g) return;
+  gamePrompted.add(g.id);
+  newGamePromptId = g.id;
+  document.getElementById('newgame-title').textContent = g.emoji + ' New game: ' + g.name;
+  document.getElementById('newgame-text').textContent =
+    (g.description ? g.description + '. ' : '') +
+    'Join to appear on its leaderboard. Your name, flag and login stay the same; your ELO there starts at ' + Number(g.rules?.eloBase ?? 1000) + '. You can switch games any time.';
+  const jb = document.getElementById('newgame-join-btn');
+  jb.textContent = 'Join ' + g.name;
+  jb.onclick = async () => { closeNewGame(); await joinGame(g.id); };
+  document.getElementById('newgame-overlay').style.display = 'flex';
+}
+function closeNewGame() { document.getElementById('newgame-overlay').style.display = 'none'; }
+async function declineNewGame() {
+  const id  = newGamePromptId;
+  closeNewGame();
+  const rec = memberships[currentPid] || {};
+  if (id && await saveMembership({ declined: [...(rec.declined || []), id] }, true)) maybePromptNewGame();   // next game, if any
+}
+
+/* 9.19.4 Admin tools. A game is never deleted (the rules forbid it): it is archived,
+   which hides it from the switcher and stops new matches but keeps every record. */
+function gameChecksHTML(selected) {
+  return games.filter(g => g.status !== 'archived' || selected.includes(g.id)).map(g =>
+    `<label><input type="checkbox" value="${esc(g.id)}" ${selected.includes(g.id) ? 'checked' : ''}> ${esc(g.emoji)} ${esc(g.name)}</label>`).join('');
+}
+function checkedGames(containerId) {
+  const box = document.getElementById(containerId);
+  return box ? [...box.querySelectorAll('input:checked')].map(i => i.value) : [];
+}
+// Add Player form: rebuilt only when the list of games changes, so ticks survive live updates
+function renderNewPlayerGames() {
+  const el = document.getElementById('newPlayerGames');
+  if (!el) return;
+  const ids = activeGames().map(g => g.id).join(',');
+  if (el.dataset.ids === ids && el.children.length) return;
+  const keep = el.children.length ? checkedGames('newPlayerGames') : [currentGameId || POOL_ID];
+  el.dataset.ids = ids;
+  el.innerHTML = gameChecksHTML(keep);
+}
+
+function renderGameList() {
+  const el = document.getElementById('game-list');
+  if (!el) return;
+  el.innerHTML = games.map(g => {
+    const n        = data.matches.filter(m => m.gameId === g.id).length;
+    const pl       = gamePlayers(g.id).length;
+    const archived = g.status === 'archived';
+    const r        = g.rules || {};
+    return `<div class="card" style="${archived ? 'opacity:0.6' : ''}"><div class="row">
+      <div>
+        <span style="font-weight:700">${esc(g.emoji)} ${esc(g.name)}</span>${archived ? ' <span style="color:#f59e0b;font-size:12px">archived</span>' : ''}
+        <div style="color:#64748b;font-size:12px">${pl} player${pl !== 1 ? 's' : ''} · ${n} match${n !== 1 ? 'es' : ''} · K ${esc(r.eloK ?? 32)} · start ${esc(r.eloBase ?? 1000)}</div>
+      </div>
+      <div class="btn-actions">
+        <button class="btn-act btn-act-edit" onclick="editGame(${jsArg(g.id)})">✏️ Edit</button>
+        <button class="btn-act btn-act-dispute" onclick="toggleArchiveGame(${jsArg(g.id)})">${archived ? '♻️ Restore' : '📦 Archive'}</button>
+      </div></div></div>`;
+  }).join('');
+}
+
+// Reads the number boxes of the add/edit game forms; null (with a message) when they are not valid
+function readRules(kId, baseId) {
+  const k = Number(document.getElementById(kId).value), base = Number(document.getElementById(baseId).value);
+  if (!(k >= 1 && k <= 200))        { showMessage('K-factor must be between 1 and 200!', 'error'); return null; }
+  if (!(base >= 0 && base <= 5000)) { showMessage('Starting ELO must be between 0 and 5000!', 'error'); return null; }
+  return { eloK: k, eloBase: base };
+}
+function slugify(name) {
+  let id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+  if (id.length < 2) id = 'game-' + newId().slice(0, 6);
+  return id;
+}
+
+async function addGame() {
+  const name  = document.getElementById('newGameName').value.trim();
+  const emoji = document.getElementById('newGameEmoji').value.trim() || '🎮';
+  const desc  = document.getElementById('newGameDesc').value.trim();
+  if (!name) { showMessage('Please enter a game name!', 'error'); return; }
+  if (games.some(g => g.name.toLowerCase() === name.toLowerCase())) { showMessage('A game with this name exists!', 'error'); return; }
+  const rules = readRules('newGameK', 'newGameBase');
+  if (!rules) return;
+  let id = slugify(name);
+  for (let i = 2; getGame(id); i++) id = slugify(name).slice(0, 26) + '-' + i;     // ids never repeat
+  const order = Math.max(0, ...games.map(g => Number(g.order) || 0)) + 1;
+  if (!await sync(() => setDoc(doc(db, 'games', id), gameDoc({ name, emoji, description: desc, status: 'active', order, rules })))) return;
+  ['newGameName', 'newGameEmoji', 'newGameDesc'].forEach(x => document.getElementById(x).value = '');
+  logEvent(analytics, 'game_added', { game: id });
+  showMessage(name + ' added! Players will be asked to join it.', 'success');
+}
+
+function editGame(id) {
+  const g = getGame(id);
+  if (!g) return;
+  document.getElementById('edit-game-id').value    = id;
+  document.getElementById('edit-game-name').value  = g.name;
+  document.getElementById('edit-game-emoji').value = g.emoji;
+  document.getElementById('edit-game-desc').value  = g.description || '';
+  document.getElementById('edit-game-k').value     = (g.rules || {}).eloK ?? 32;
+  document.getElementById('edit-game-base').value  = (g.rules || {}).eloBase ?? 1000;
+  document.getElementById('edit-game-overlay').style.display = 'flex';
+}
+function closeEditGameModal() { document.getElementById('edit-game-overlay').style.display = 'none'; }
+async function saveEditGame() {
+  const id = document.getElementById('edit-game-id').value, g = getGame(id);
+  const name = document.getElementById('edit-game-name').value.trim();
+  if (!g) return;
+  if (!name) { showMessage('Please enter a game name!', 'error'); return; }
+  if (games.some(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) { showMessage('A game with this name exists!', 'error'); return; }
+  const rules = readRules('edit-game-k', 'edit-game-base');
+  if (!rules) return;
+  const changedRules = rules.eloK !== Number((g.rules || {}).eloK ?? 32) || rules.eloBase !== Number((g.rules || {}).eloBase ?? 1000);
+  if (changedRules && data.matches.some(m => m.gameId === id) && !confirm('Changing the ELO numbers recalculates every rating in this game, past matches included. Continue?')) return;
+  const upd = { ...g, name, emoji: document.getElementById('edit-game-emoji').value.trim() || '🎮',
+    description: document.getElementById('edit-game-desc').value.trim(), rules };
+  if (!await sync(() => setDoc(doc(db, 'games', id), gameDoc(upd)))) return;
+  closeEditGameModal();
+  showMessage('Game updated!', 'success');
+}
+async function toggleArchiveGame(id) {
+  const g = getGame(id);
+  if (!g) return;
+  const archiving = g.status !== 'archived';
+  if (archiving && activeGames().length <= 1) { showMessage('Keep at least one active game!', 'error'); return; }
+  if (archiving && !confirm('Archive ' + g.name + '? It disappears from the switcher and takes no new matches. History is kept and you can restore it.')) return;
+  if (await sync(() => setDoc(doc(db, 'games', id), gameDoc({ ...g, status: archiving ? 'archived' : 'active' }))))
+    showMessage(g.name + (archiving ? ' archived' : ' restored'), 'success');
 }
 
 /* ----------------------------------------------------------
@@ -2441,6 +2895,14 @@ window.sendResetLink          = sendResetLink;
 window.completeReset          = completeReset;
 window.approveReset           = approveReset;
 window.denyReset              = denyReset;
+window.switchGame             = switchGame;
+window.joinGame               = joinGame;
+window.declineNewGame         = declineNewGame;
+window.addGame                = addGame;
+window.editGame               = editGame;
+window.saveEditGame           = saveEditGame;
+window.closeEditGameModal     = closeEditGameModal;
+window.toggleArchiveGame      = toggleArchiveGame;
 
 render();
 handleEmailLink();      // opens the reset screen when the page was opened from an email link
